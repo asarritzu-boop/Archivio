@@ -1,0 +1,26 @@
+{
+  "name": "Archivio Viaggiante",
+  "short_name": "Archivio",
+  "description": "Archivio documenti per la visita del sorvegliante di circoscrizione",
+  "start_url": "/Archivio/",
+  "scope": "/Archivio/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f5f5f7",
+  "theme_color": "#007aff",
+  "lang": "it",
+  "icons": [
+    {
+      "src": "icona-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icona-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
