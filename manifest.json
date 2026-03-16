@@ -5,7 +5,6 @@
   "start_url": "/Archivio/",
   "scope": "/Archivio/",
   "display": "standalone",
-  "orientation": "any",
   "background_color": "#f5f5f7",
   "theme_color": "#007aff",
   "lang": "it",
