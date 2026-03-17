@@ -350,6 +350,96 @@
     </script>
 
     <script id="app-script">
+                const ArchiveCrypto = {
+            async deriveKey(password, salt) {
+                const enc = new TextEncoder();
+                const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
+                return crypto.subtle.deriveKey(
+                    { name: "PBKDF2", salt: salt, iterations: 100000, hash: "SHA-256" },
+                    keyMaterial, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
+                );
+            },
+            async encryptData(plainText, password) {
+                const enc = new TextEncoder();
+                const salt = crypto.getRandomValues(new Uint8Array(16));
+                const iv = crypto.getRandomValues(new Uint8Array(12));
+                const key = await this.deriveKey(password, salt);
+                const cipherBuffer = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, enc.encode(plainText));
+                
+                const toB64 = buf => {
+                    let bin = '';
+                    const bytes = new Uint8Array(buf);
+                    for(let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+                    return btoa(bin);
+                };
+                return JSON.stringify({ salt: toB64(salt), iv: toB64(iv), data: toB64(cipherBuffer) });
+            },
+            async decryptData(payloadJSON, password) {
+                const payload = JSON.parse(payloadJSON);
+                const fromB64 = b64 => {
+                    const bin = atob(b64);
+                    const bytes = new Uint8Array(bin.length);
+                    for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                    return bytes;
+                };
+                const key = await this.deriveKey(password, fromB64(payload.salt));
+                const decryptedBuffer = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(payload.iv) }, key, fromB64(payload.data));
+                return new TextDecoder().decode(decryptedBuffer);
+            }
+        };
+
+                // Gestione dell'avvio con o senza password
+                async function inizializzaApp() {
+            const payloadEl = document.getElementById('archive-crypto-payload');
+            const payloadJSON = payloadEl ? payloadEl.textContent.trim() : '';
+
+            if (payloadJSON) {
+                document.body.style.visibility = 'hidden';
+                const overlay = document.createElement('div');
+                overlay.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg-color);z-index:999999;display:flex;align-items:center;justify-content:center;`;
+                overlay.innerHTML = `
+                    <div style="background:white;border-radius:16px;padding:32px 26px;width:300px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.1);border:1px solid #e5e5ea;">
+                        <div style="font-size:40px;margin-bottom:10px;">🔐</div>
+                        <div style="font-size:16px;font-weight:600;margin-bottom:6px;">Archivio Protetto</div>
+                        <div style="font-size:13px;color:#86868b;margin-bottom:18px;">Inserisci la password</div>
+                        <div style="position:relative;margin-bottom:8px;">
+                            <input id="arc-pwd-unlock" type="password" placeholder="Password..." style="width:100%;padding:12px;border:1px solid #d1d1d6;border-radius:10px;font-size:16px;box-sizing:border-box;text-align:center;outline:none;">
+                            <span id="toggle-view" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;opacity:0.5;">👁️</span>
+                        </div>
+                        <div id="arc-pwd-err" style="color:var(--danger);font-size:12px;min-height:16px;margin-bottom:12px;"></div>
+                        <button id="arc-btn-sblocca" style="padding:12px;background:var(--accent);color:white;border:none;border-radius:10px;font-size:14px;cursor:pointer;font-weight:600;width:100%;">Apri</button>
+                    </div>`;
+                document.documentElement.appendChild(overlay);
+
+                // Logica Occhio
+                const input = overlay.querySelector('#arc-pwd-unlock');
+                overlay.querySelector('#toggle-view').onclick = () => {
+                    input.type = input.type === 'password' ? 'text' : 'password';
+                };
+
+                async function verifica() {
+                    const pwd = input.value;
+                    try {
+                        const jsonDecriptato = await ArchiveCrypto.decryptData(payloadJSON, pwd);
+                        window.ARCHIVE_DATA = JSON.parse(jsonDecriptato);
+                        overlay.remove();
+                        document.body.style.visibility = 'visible';
+                        renderFolders();
+                    } catch (err) {
+                        document.getElementById('arc-pwd-err').textContent = 'Password errata';
+                        input.value = '';
+                    }
+                }
+                document.getElementById('arc-btn-sblocca').onclick = verifica;
+                input.onkeydown = e => { if(e.key==='Enter') verifica(); };
+            } else {
+                renderFolders();
+            }
+        }
+
+
+        window.onload = inizializzaApp;
+        
         let currentFolderId = null;
         let folderStack = []; // stack per navigazione: [{id, name}, ...]
 
@@ -1063,20 +1153,100 @@ if (ext === 'zip') {
         }
 
 
-        async function saveArchive() {
+                async function saveArchive() {
+                const prendiCodice = id => { const el = document.getElementById(id); return el ? el.textContent : ''; };
+                
+                const getScriptText = id => { const el = document.getElementById(id); return el ? el.textContent : ''; };
+                
             const btn = document.getElementById('btn-save');
             const originalText = btn.textContent;
             btn.textContent = "Salvataggio...";
             btn.disabled = true;
+let pwdScelta = null; // Questa riga DEVE stare qui fuori
+const op = '<script';
+const ct = '</' + 'script>';
 
             try {
-                const ct = '<' + '/script>';
-                const op = '<script';
+            
+            
+                // 1. Chiedi se l'utente vuole proteggere il clone
+                const vuolePassword = await new Promise(resolve => {
+                    const overlay = document.createElement('div');
+                    overlay.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;`;
+                    overlay.innerHTML = `
+                        <div style="background:white;border-radius:16px;padding:28px 24px;width:300px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,0.25);">
+                            <div style="font-size:32px;margin-bottom:10px;">🔐</div>
+                            <div style="font-size:16px;font-weight:600;margin-bottom:6px;">Protezione Archivio</div>
+                            <div style="font-size:13px;color:#86868b;margin-bottom:20px;">Vuoi proteggere questo clone con una password?</div>
+                            <div style="display:flex;gap:10px;justify-content:center;">
+                                <button id="btn-si-pwd" style="flex:1;padding:10px;background:var(--accent);color:white;border:none;border-radius:10px;font-size:14px;cursor:pointer;font-weight:600;">✅ Sì</button>
+                                <button id="btn-no-pwd" style="flex:1;padding:10px;background:var(--secondary-btn);color:#333;border:none;border-radius:10px;font-size:14px;cursor:pointer;">❌ No</button>
+                            </div>
+                        </div>`;
+                    document.body.appendChild(overlay);
+                    overlay.querySelector('#btn-si-pwd').onclick = () => { overlay.remove(); resolve(true); };
+                    overlay.querySelector('#btn-no-pwd').onclick = () => { overlay.remove(); resolve(false); };
+                });
 
-                function getScriptText(id) {
-                    const el = document.getElementById(id);
-                    return el ? el.textContent : '';
+                                let hashPassword = null;
+                if (vuolePassword) {
+                    hashPassword = await new Promise(resolve => {
+                        const overlay = document.createElement('div');
+                        overlay.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;`;
+                        overlay.innerHTML = `
+                            <div style="background:white;border-radius:16px;padding:28px 24px;width:300px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,0.25);">
+                                <div style="font-size:32px;margin-bottom:10px;">🔑</div>
+                                <div style="font-size:16px;font-weight:600;margin-bottom:16px;">Imposta Password</div>
+                                
+                                <div style="position:relative;margin-bottom:10px;">
+                                    <input id="pwd-input" type="password" placeholder="Inserisci password..." style="width:100%;padding:12px;padding-right:40px;border:1px solid #d1d1d6;border-radius:10px;font-size:16px;box-sizing:border-box;text-align:center;outline:none;">
+                                    <span id="toggle-pwd1" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px;">👁</span>
+                                </div>
+                                
+                                <div style="position:relative;margin-bottom:6px;">
+                                    <input id="pwd-confirm" type="password" placeholder="Conferma password..." style="width:100%;padding:12px;padding-right:40px;border:1px solid #d1d1d6;border-radius:10px;font-size:16px;box-sizing:border-box;text-align:center;outline:none;">
+                                    <span id="toggle-pwd2" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px;">👁</span>
+                                </div>
+
+                                <div id="pwd-err" style="color:var(--danger);font-size:12px;min-height:16px;margin-bottom:10px;"></div>
+                                <button id="btn-conferma-pwd" style="padding:12px;background:var(--accent);color:white;border:none;border-radius:10px;font-size:14px;cursor:pointer;font-weight:600;width:100%;">Conferma</button>
+                                <button id="btn-annulla-pwd" style="margin-top:10px;padding:12px;background:transparent;color:#888;border:none;font-size:14px;cursor:pointer;width:100%;">Annulla</button>
+                            </div>`;
+                        document.body.appendChild(overlay);
+
+                        // Gestione visibilità campi password
+                        overlay.querySelector('#toggle-pwd1').onclick = () => {
+                            const i = overlay.querySelector('#pwd-input');
+                            i.type = i.type === 'password' ? 'text' : 'password';
+                        };
+                        overlay.querySelector('#toggle-pwd2').onclick = () => {
+                            const i = overlay.querySelector('#pwd-confirm');
+                            i.type = i.type === 'password' ? 'text' : 'password';
+                        };
+
+                        overlay.querySelector('#btn-conferma-pwd').onclick = () => {
+                            const p1 = overlay.querySelector('#pwd-input').value;
+                            const p2 = overlay.querySelector('#pwd-confirm').value;
+                            if (!p1) { overlay.querySelector('#pwd-err').textContent = 'La password non può essere vuota.'; return; }
+                            if (p1 !== p2) { overlay.querySelector('#pwd-err').textContent = 'Le password non coincidono.'; return; }
+                            overlay.remove();
+                            resolve(p1);
+                        };
+
+                        overlay.querySelector('#btn-annulla-pwd').onclick = () => {
+                            overlay.remove();
+                            resolve(null);
+                        };
+                    });
+
+                    // Se l'utente preme Annulla, fermiamo la generazione del clone
+                    if (!hashPassword) {
+                        btn.textContent = originalText;
+                        btn.disabled = false;
+                        return;
+                    }
                 }
+
 
                 async function fetchLib(url) {
                     const res = await fetch(url);
@@ -1084,29 +1254,45 @@ if (ext === 'zip') {
                     return await res.text();
                 }
 
-                // Recupera o scarica
+                // Recupera librerie
                 const jszip     = getScriptText('lib-jszip')     || await fetchLib('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
                 const mammoth   = getScriptText('lib-mammoth')   || await fetchLib('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
                 const xlsx      = getScriptText('lib-xlsx')      || await fetchLib('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
                 const marked    = getScriptText('lib-marked')    || await fetchLib('https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js');
                 const pdfjs     = getScriptText('lib-pdfjs')     || await fetchLib('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
                 const pdfWorker = getScriptText('lib-pdfjs-worker') || await fetchLib('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js');
+                
 
-                function escapeScript(code) {
-                    return code.replace(/<\/script>/gi, ct);
-                }
+                function escapeScript(code) { return code.replace(/<\/script>/gi, ct); }
 
                 const appScript = getScriptText('app-script');
-                const data = JSON.stringify(window.ARCHIVE_DATA);
+                const dataString = JSON.stringify(window.ARCHIVE_DATA);
+                
+                
+                // 2. Prepara il Payload (Criptato o in chiaro)
+                let payloadCriptato = '';
+                
+              // Se c'è una password, i dati in chiaro diventano 'null' (illeggibili)
+let stringaArchivioInChiaro = pwdScelta ? 'null' : JSON.stringify(window.ARCHIVE_DATA);
 
-                // Costruzione dell'HTML: tutte le librerie restano in text/plain
+
+                if (vuolePassword && hashPassword) {
+                    payloadCriptato = await ArchiveCrypto.encryptData(dataString, hashPassword);
+                } else {
+                    stringaArchivioInChiaro = dataString;
+                }
+                // Se c'è una password, i dati in chiaro diventano 'null'
+let dataInChiaro = pwdScelta ? 'null' : dataString; 
+
+
+                // 3. Costruzione dell'HTML
                 const clone = [
                     '<!DOCTYPE html>',
                     '<html lang="it">',
                     '<head>',
                     '<meta charset="UTF-8">',
                     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
-                    '<title>ARCHIVIO PER LA VISITA DEL VIAGGIANTE<' + '/title>',
+                    '<title>Archivio Viaggiante<' + '/title>',
                     op + ' id="lib-jszip" type="text/plain">\n' + escapeScript(jszip) + '\n' + ct,
                     op + ' id="lib-mammoth" type="text/plain">\n' + escapeScript(mammoth) + '\n' + ct,
                     op + ' id="lib-xlsx" type="text/plain">\n' + escapeScript(xlsx) + '\n' + ct,
@@ -1120,19 +1306,23 @@ if (ext === 'zip') {
                     '<div id="folders-view" class="folders-container grid"><' + '/div>',
                     (function(){ const fv = document.getElementById('folder-view').cloneNode(true); fv.style.display='none'; return fv.outerHTML; })(),
                     document.getElementById('preview-modal').outerHTML,
-                    op + ' id="archive-data-script">\n window.ARCHIVE_DATA = ' + data + ';\n' + ct,
+                    // QUI INSERIAMO IL PAYLOAD E I DATI
+                    op + ' id="archive-crypto-payload" type="application/json">\n' + payloadCriptato + '\n' + ct,
+                    op + ' id="archive-data-script">\n window.ARCHIVE_DATA = ' + stringaArchivioInChiaro + ';\n' + ct,
+                   
                     op + ' id="app-script">\n' + appScript + '\n' + ct,
                     '<' + '/body>',
                     '<' + '/html>'
                 ].join('\n');
 
-                const blob = new Blob([clone], {type: 'text/html;charset=utf-8'});
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = 'Archivio_' + new Date().toISOString().split('T')[0] + '.html';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
+                const blob = new Blob([clone], {type: 'text/html'});
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = 'Archivio_' + (pwdScelta ? 'Protetto_' : '') + new Date().getTime() + '.html';
+a.click(); // <--- Questa riga ora viene eseguita istantaneamente al click su "Conferma"
+setTimeout(() => URL.revokeObjectURL(url), 1000); // Pulizia cache immediata
+
 
             } catch(e) {
                 alert('Errore nel salvataggio: ' + e.message);
@@ -1142,8 +1332,8 @@ if (ext === 'zip') {
             }
         }
 
-
-        window.onload = () => renderFolders();
+window.onload = inizializzaApp;
+        
     </script>
 </body>
 </html>
