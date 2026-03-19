@@ -414,11 +414,14 @@ button.btn-outline-green { background: transparent; color: #248a3d; border: 1px 
 /* ── Barra azioni multi-selezione ── */
 #multi-action-bar {
     display: none;
-    position: sticky;
-    bottom: 16px;
-    z-index: 500;
-    max-width: 700px;
-    margin: 12px auto 0 auto;
+    position: fixed;
+bottom: 16px;
+left: 50%;
+transform: translateX(-50%);
+z-index: 500;
+width: calc(100% - 40px);
+max-width: 700px;
+margin: 0;
     background: white;
     color: #1c1c1e;
     border: 1px solid #e5e5ea;
