@@ -457,13 +457,50 @@ margin: 0;
 #multi-action-bar button.act-close { background: var(--secondary-btn) !important; color: #3a3a3c; border: 1px solid transparent; }
 #folders-view .folder-actions button:first-child,
 #subfolder-list .folder-actions button:first-child { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+   
+    header { 
+    position: relative; /* Necessario per il posizionamento del pulsante */
+    max-width: 1000px; 
+    margin: 0 auto 20px auto; 
+    text-align: center; 
+}
+
+.compress-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    text-decoration: none;
+    background-color: var(--secondary-btn);
+    width: 96px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    border: 1px solid #d1d1d6;
+    transition: background 0.2s;
+}
+
+.compress-btn:hover {
+    background-color: #e2e2e7;
+}
+
+/* Regola per dispositivi mobili: evita che si sovrapponga al titolo se lo schermo è piccolo */
+@media (max-width: 400px) {
+    .compress-btn {
+        position: static;
+        margin: 0 auto 10px auto;
+    }
+}
     </style>
 </head>
 <body onclick="deselectAll(event)">
 
     <header id="main-header">
-        <h1>Archivio Digitale</h1>
-
+    <a href="https://asarritzu-boop.github.io/Compressor/" target="_blank" class="compress-btn" title="Vai al Compressore">🗜️compress</a>
+    <h1>Archivio Digitale</h1>
+        
         <div class="search-container" onclick="event.stopPropagation()">
             <input type="text" id="search-bar" list="search-suggestions" class="search-input" placeholder="Cerca file o cartelle..." oninput="filterArchive()">
             <datalist id="search-suggestions"></datalist>
