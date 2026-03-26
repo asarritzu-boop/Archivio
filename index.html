@@ -2924,8 +2924,7 @@ const ct = '</' + 'script>';
                 const pdfWorker = getScriptText('lib-pdfjs-worker') || await fetchLib('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js');
                 
 
-                function escapeScript(code) { return code.replace(/<\/script>/gi, ct); }
-
+                function escapeScript(code) { return code.replace(/<\/script>/gi, '<\\/script>'); }
                 const appScript = getScriptText('app-script');
                 const dataString = JSON.stringify(window.ARCHIVE_DATA);
                 
