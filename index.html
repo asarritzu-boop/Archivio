@@ -1332,7 +1332,7 @@ function buildArticleItem(art, folderId) {
         <span class="article-star ${art.pinned ? 'pinned' : ''}" title="${art.pinned ? 'Rimuovi da in alto' : 'Metti in cima'}">★</span>
         <div class="file-info" style="flex-grow:1;min-width:0;">
             <div class="file-name">🔗 ${art.label}</div>
-            <div class="file-size" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${art.url}</div>
+            
         </div>
         <div class="article-actions">
             <button onclick="openArticlePreview('${art.id}','${folderId || ''}')">Apri</button>
