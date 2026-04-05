@@ -2468,7 +2468,8 @@ document.getElementById('multi-action-bar').outerHTML,
 
                 const blob = new Blob([clone], {type: 'text/html'});
 
-if ('showSaveFilePicker' in window) {
+const isXiaomi = /xiaomi|miui/i.test(navigator.userAgent);
+if ('showSaveFilePicker' in window && !isXiaomi) {
     try {
         if (!fileHandleSalvataggio) {
             fileHandleSalvataggio = await window.showSaveFilePicker({
@@ -2487,13 +2488,26 @@ if ('showSaveFilePicker' in window) {
         fileHandleSalvataggio = null;
     }
 } else {
-    // Fallback browser non supportati
+    const nomeFile = 'Archivio_' + (pwdScelta ? 'Protetto_' : '') + new Date().toLocaleDateString().replace(/\//g, '-') + '.html';
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'Archivio_' + (pwdScelta ? 'Protetto_' : '') + new Date().getTime() + '.html';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    btn.textContent = originalText;
+    btn.disabled = false;
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99999;display:flex;align-items:center;justify-content:center;`;
+    overlay.innerHTML = `
+        <div style="background:white;border-radius:14px;padding:28px 24px;width:300px;text-align:center;font-family:'Segoe UI',sans-serif;">
+            <div style="font-size:32px;margin-bottom:10px;">💾</div>
+            <div style="font-size:12pt;font-weight:bold;margin-bottom:8px;">Salva il file</div>
+            <div style="font-size:9pt;color:#666;margin-bottom:20px;">Tocca il pulsante qui sotto per scaricare il file sul dispositivo.</div>
+            <a id="btn-dl-archivio" href="${url}" download="${nomeFile}"
+               style="display:block;background:#1565C0;color:white;padding:12px;border-radius:8px;text-decoration:none;font-weight:bold;margin-bottom:10px;">
+                📥 Scarica File
+            </a>
+            <button id="btn-ann-archivio" style="background:transparent;border:none;color:#999;cursor:pointer;font-size:9pt;width:100%;">Annulla</button>
+        </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#btn-ann-archivio').onclick = () => { overlay.remove(); URL.revokeObjectURL(url); };
+    overlay.querySelector('#btn-dl-archivio').onclick = () => { setTimeout(() => { overlay.remove(); URL.revokeObjectURL(url); }, 1000); };
 }
 
 
