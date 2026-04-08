@@ -2702,6 +2702,12 @@ function hideFolderStickyHeader() {
 
 // ── Back button ──
 function goBackFromFolder() {
+    document.getElementById('folder-view').style.display = 'none';
+                document.getElementById('folders-view').style.display = '';
+                document.getElementById('free-articles-view').style.display = '';
+                document.getElementById('main-header').style.display = 'block';
+                document.getElementById('menu-group-home').style.display = 'block';
+                document.getElementById('menu-group-folder').style.display = 'none';
     hideFolderStickyHeader();
     if (typeof folderHistory !== 'undefined' && folderHistory.length > 1) {
         folderHistory.pop();
