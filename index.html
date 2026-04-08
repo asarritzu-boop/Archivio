@@ -1,0 +1,2782 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Archivio Digitale</title>
+
+    <!-- PWA: colore browser e tema -->
+    <meta name="theme-color" content="#007aff">
+    <meta name="application-name" content="Archivio Digitale">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Archivio Digitale">
+
+    <!-- Icona per Apple -->
+    <link rel="apple-touch-icon" href="https://asarritzu-boop.github.io/Archivio/icona-192.png">
+
+    <!-- Open Graph (WhatsApp, Telegram, anteprima link) -->
+    <meta property="og:title" content="Archivio Digitale">
+    <meta property="og:description" content="Archivio documenti Digitale">
+    <meta property="og:image" content="https://asarritzu-boop.github.io/Archivio/icona-512.png">
+    <meta property="og:url" content="https://asarritzu-boop.github.io/Archivio/">
+    <meta property="og:type" content="website">
+
+    <!-- Manifest PWA -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Service Worker -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log('SW registrato:', reg.scope))
+            .catch(err => console.error('SW errore:', err));
+        });
+      }
+    </script>
+    
+        <script id="lib-jszip" type="text/plain"></script>
+    <script id="lib-mammoth" type="text/plain"></script>
+    <script id="lib-xlsx" type="text/plain"></script>
+    <script id="lib-marked" type="text/plain"></script>
+    <script id="lib-pdfjs" type="text/plain"></script>
+    <script id="lib-pdfjs-worker" type="text/plain"></script>
+
+
+    <style>
+        :root {
+            --bg-color: #f5f5f7;
+            --text-color: #1d1d1f;
+            --accent: #007aff;
+            --danger: #ff3b30;
+            --secondary-btn: #e8e8ed;
+            --border-radius: 12px;
+            --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+            --header-height: 56px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-stack); }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding-top: calc(var(--header-height) + 60px);
+            padding-left: 15px;
+            padding-right: 15px;
+            padding-bottom: 140px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── Sticky Header ── */
+        header#main-header {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 300;
+            background: rgba(245,245,247,0.92);
+            backdrop-filter: saturate(180%) blur(16px);
+            -webkit-backdrop-filter: saturate(180%) blur(16px);
+            border-bottom: 1px solid rgba(0,0,0,0.08);
+            padding: 0 15px;
+        }
+
+        .header-top-row {
+            display: flex;
+            align-items: center;
+            height: var(--header-height);
+            max-width: 1000px;
+            margin: 0 auto;
+            gap: 10px;
+        }
+
+        h1 {
+            font-size: 18px;
+            font-weight: 700;
+            flex: 1;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* ── Hamburger Button ── */
+        #menu-toggle {
+            background: transparent;
+            color: var(--accent);
+            border: none;
+            padding: 6px 8px;
+            border-radius: 8px;
+            font-size: 22px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: background 0.15s;
+            line-height: 1;
+        }
+        #menu-toggle:hover { background: rgba(0,122,255,0.08); }
+
+        /* External link button (🗜️ press) */
+        .header-ext-link {
+            background: transparent;
+            color: var(--text-color);
+            border: none;
+            padding: 6px 8px;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            text-decoration: none;
+            transition: background 0.15s;
+        }
+        .header-ext-link:hover { background: rgba(0,0,0,0.06); }
+
+        /* View toggle on right */
+        .view-toggle-row {
+            display: flex;
+            gap: 4px;
+        }
+        .view-toggle-row button {
+            background: transparent;
+            color: #86868b;
+            border: none;
+            padding: 4px 7px;
+            font-size: 16px;
+            border-radius: 6px;
+        }
+        .view-toggle-row button:hover { background: rgba(0,0,0,0.06); }
+
+        /* ── Dropdown Menu ── */
+      #header-menu {
+            display: none;
+            position: fixed;
+            bottom: 84px;
+            right: 20px;
+            background: white;
+            border-radius: 14px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.14);
+            border: 1px solid rgba(0,0,0,0.08);
+            padding: 6px;
+            min-width: 200px;
+            z-index: 600;
+            animation: menuFadeIn 0.15s ease;
+        }
+        #header-menu.open { display: block; }
+        @keyframes menuFadeIn {
+            from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .menu-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 9px;
+            border: none;
+            background: transparent;
+            color: var(--text-color);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            text-align: left;
+            transition: background 0.12s;
+        }
+        .menu-item:hover { background: var(--bg-color); }
+        .menu-item.danger { color: var(--danger); }
+        .menu-item.green  { color: #248a3d; }
+        .menu-item.purple { color: #8e44ad; }
+        .menu-separator { height: 1px; background: #f0f0f5; margin: 4px 0; }
+        .menu-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 350;
+        }
+        .menu-overlay.open { display: block; }
+
+        /* ── Search bar below header ── */
+        .search-container {
+            position: fixed;
+            top: var(--header-height);
+            left: 0; right: 0;
+            z-index: 290;
+            background: rgba(245,245,247,0.92);
+            backdrop-filter: saturate(180%) blur(16px);
+            -webkit-backdrop-filter: saturate(180%) blur(16px);
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+            padding: 8px 15px;
+        }
+        .search-inner {
+            position: relative;
+            max-width: 600px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 9px 36px 9px 14px;
+            border-radius: 10px;
+            border: 1px solid #d1d1d6;
+            background: white;
+            font-size: 15px;
+            outline: none;
+        }
+
+        .clear-search {
+            position: absolute;
+            right: 10px;
+            background: #8e8e93;
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            cursor: pointer;
+            border: none;
+            display: none;
+        }
+
+        /* Hide old header-buttons and view-controls */
+        .header-buttons { display: none !important; }
+        .view-controls { display: none !important; }
+
+        button {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        button.danger { background-color: transparent; color: var(--danger); border: 1px solid #ff3b3044; }
+        button.btn-outline-blue  { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+        button.btn-outline-green { background: transparent; color: #248a3d; border: 1px solid #248a3d; }
+        button.btn-outline-purple { background: transparent; color: #8e44ad; border: 1px solid #8e44ad; }
+
+        .article-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #f2f2f7;
+            gap: 12px;
+            cursor: pointer;
+            background: white;
+        }
+        .article-item.selected { background: #f5f0ff; }
+        .article-item .article-star { font-size: 20px; cursor: pointer; flex-shrink: 0; color: #ccc; transition: color 0.2s; }
+        .article-item .article-star.pinned { color: #f5a623; }
+        .article-item .article-actions { display: none; gap: 6px; }
+        .article-item.selected .article-actions { display: flex; }
+        .article-section-title { font-size: 12px; color: #86868b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin: 16px auto 6px auto; max-width: 1000px; padding: 0 4px; }
+        button.secondary { background-color: var(--secondary-btn); color: #3a3a3c; border: 1px solid transparent; }
+
+        /* ── Folder view sticky title bar ── */
+        #folder-view-header {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 300;
+            background: rgba(245,245,247,0.92);
+            backdrop-filter: saturate(180%) blur(16px);
+            -webkit-backdrop-filter: saturate(180%) blur(16px);
+            border-bottom: 1px solid rgba(0,0,0,0.08);
+            padding: 0 15px;
+            display: none;
+        }
+        #folder-view-header.active { display: block; }
+        .folder-header-top {
+            display: flex;
+            align-items: center;
+            height: var(--header-height);
+            max-width: 1000px;
+            margin: 0 auto;
+            gap: 10px;
+        }
+        #folder-back-btn {
+            background: transparent;
+            border: none;
+            color: var(--accent);
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            padding: 6px 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        #folder-title-label {
+            font-size: 17px;
+            font-weight: 700;
+            flex: 1;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #folder-menu-toggle {
+            background: transparent;
+            color: var(--accent);
+            border: none;
+            padding: 6px 8px;
+            border-radius: 8px;
+            font-size: 22px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            line-height: 1;
+        }
+        #folder-menu-toggle:hover { background: rgba(0,122,255,0.08); }
+
+        #folder-header-menu {
+            display: none;
+            position: fixed;
+            top: calc(var(--header-height) + 4px);
+            left: 12px;
+            background: white;
+            border-radius: 14px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.14);
+            border: 1px solid rgba(0,0,0,0.08);
+            padding: 6px;
+            min-width: 200px;
+            z-index: 400;
+            animation: menuFadeIn 0.15s ease;
+        }
+        #folder-header-menu.open { display: block; }
+
+        /* Layout Griglia/Elenco */
+        .folders-container.grid,
+        #free-files-view.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 15px;
+    max-width: 1000px;
+    margin: 15px auto 0 auto;
+    padding: 0;
+    list-style: none;
+}
+
+#free-files-view.grid .file-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    background: white;
+    border: 1px solid #e5e5ea;
+    border-radius: 12px;
+    padding: 15px;
+    cursor: pointer;
+    gap: 6px;
+}
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 15px;
+        }
+
+        .folders-container.list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .folder-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 15px;
+            display: flex;
+            border: 1px solid #e5e5ea;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .grid .folder-card { flex-direction: column; align-items: center; text-align: center; }
+        .list .folder-card { flex-direction: row; align-items: center; padding: 10px 15px; }
+
+        .folder-card.selected { border: 2px solid var(--accent); background: #f0f7ff; }
+
+        .folder-icon { font-size: 40px; margin-bottom: 8px; }
+        .list .folder-icon { font-size: 24px; margin-bottom: 0; margin-right: 15px; }
+
+        .folder-name { font-size: 14px; font-weight: 600; }
+        .folder-count { font-size: 11px; color: #86868b; }
+
+        .folder-actions { display: none; gap: 5px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
+        .folder-card.selected .folder-actions { display: flex; }
+
+        /* Vista Cartella */
+        #folder-view {
+            display: none;
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        .file-list { list-style: none; margin-top: 10px; }
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #f2f2f7;
+            gap: 12px;
+            cursor: pointer;
+        }
+
+        .file-item.selected { background: #f0f7ff; }
+
+       .file-info { flex-grow: 1; min-width: 0; }
+.file-list.grid .file-info { flex-grow: 0; width: 100%; }
+        .file-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-size { font-size: 11px; color: #86868b; }
+
+        .file-actions { display: none; gap: 6px; }
+        .file-item.selected .file-actions { display: flex; }
+        .file-list.list .file-icon { display: none; }
+       /* File in modalità griglia */
+.file-list.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.file-list.grid .file-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    border-bottom: none;
+    border: 1px solid #e5e5ea;
+    border-radius: 12px;
+    background: white;
+    padding: 14px 10px;
+}
+
+.file-list.grid .file-name {
+    font-size: 12px;
+    white-space: normal;
+    word-break: break-word;
+    overflow: visible;
+    text-overflow: unset;
+}
+
+.file-list.grid .file-size { margin-top: 2px; }
+
+.file-list.grid .file-actions {
+    flex-direction: column;
+    width: 100%;
+    margin-top: 8px;
+}
+
+.file-list.grid .file-item.selected .file-actions { display: flex; }
+
+        @media (max-width: 600px) {
+            .file-actions button { padding: 8px; font-size: 12px; }
+            .header-buttons button { flex: 1; font-size: 12px; padding: 12px 5px; }
+        }
+
+        #file-input { display: none; }
+
+        /* Modale Anteprima */
+        #preview-modal { display: none; position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.75); flex-direction: column; }
+        #preview-modal.open { display: flex; }
+        #preview-bar { display: flex; align-items: center; justify-content: space-between; background: #1c1c1e; color: white; padding: 10px 16px; gap: 10px; flex-shrink: 0; }
+        #preview-bar span { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+        #preview-bar button { background: #3a3a3c; color: white; padding: 8px 14px; font-size: 13px; border-radius: 8px; flex-shrink: 0; }
+        #preview-bar .close-btn { background: #ff3b30; }
+        #preview-body { flex: 1; overflow: auto; background: #f5f5f7; display: flex; flex-direction: column; align-items: center; padding: 16px; gap: 0; }
+        #preview-body iframe { width: 100%; height: 100%; border: none; border-radius: 10px; min-height: 70vh; }
+        #preview-body img { max-width: 100%; border-radius: 10px; }
+        #preview-body audio, #preview-body video { width: 100%; max-width: 600px; margin-top: 20px; }
+        #preview-body .preview-text { background: white; padding: 20px; width: 100%; max-width: 900px; white-space: pre-wrap; word-wrap: break-word; font-family: monospace; font-size: 13px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        #preview-body .preview-rich { background: white; padding: 30px; width: 100%; max-width: 800px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); line-height: 1.6; }
+        #preview-body .preview-table { background: white; padding: 20px; width: 100%; overflow: auto; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        #preview-body .preview-table table { border-collapse: collapse; width: 100%; font-size: 14px; }
+        #preview-body .preview-table th, #preview-body .preview-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        #preview-body .preview-table tr:nth-child(even) { background: #f9f9f9; }
+        #preview-body .preview-msg { text-align: center; color: #666; margin-top: 40px; }
+        #preview-body .preview-msg a { display: inline-block; margin-top: 16px; padding: 10px 16px; background: #007aff; color: white; border-radius: 8px; text-decoration: none; }
+        /* Container per anteprime Word */
+.preview-rich {
+    padding: 20px;
+    background: white;
+    color: black;
+    line-height: 1.6;
+    text-align: left;
+}
+
+/* Stile per tabelle Excel */
+.preview-table table {
+    border-collapse: collapse;
+    width: 100%;
+    background: white;
+}
+.preview-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    font-size: 13px;
+}
+/* Anteprima ZIP */
+.zip-preview { background: white; border-radius: 10px; padding: 20px; width: 100%; max-width: 700px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+.zip-preview .zip-header { font-size: 13px; color: #86868b; margin-bottom: 14px; border-bottom: 1px solid #f0f0f5; padding-bottom: 10px; }
+.zip-preview .zip-file-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f2f2f7; font-size: 14px; }
+.zip-preview .zip-file-row:last-child { border-bottom: none; }
+.zip-file-icon { font-size: 20px; flex-shrink: 0; }
+.zip-file-info { flex-grow: 1; min-width: 0; }
+.zip-file-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zip-file-size { font-size: 11px; color: #86868b; }
+.zip-dl-btn { background: var(--accent); color: white; border: none; padding: 7px 12px; border-radius: 7px; font-size: 13px; cursor: pointer; flex-shrink: 0; }
+
+#folder-view button {
+    padding: 7px 11px;
+    font-size: 13px;
+}
+.header-buttons button {
+    padding: 7px 11px;
+    font-size: 12px;
+}
+
+/* Breadcrumb a pillole */
+#breadcrumb-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    margin-bottom: 4px;
+    min-width: 0;
+}
+#breadcrumb-bar .bc-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background 0.15s, color 0.15s;
+}
+#breadcrumb-bar .bc-pill.bc-link {
+    background: #e8f0fe;
+    color: var(--accent);
+    cursor: pointer;
+    border: 1px solid #c5d8fd;
+}
+#breadcrumb-bar .bc-pill.bc-link:hover {
+    background: var(--accent);
+    color: white;
+}
+#breadcrumb-bar .bc-pill.bc-current {
+    background: var(--accent);
+    color: white;
+    cursor: default;
+    border: 1px solid var(--accent);
+}
+#breadcrumb-bar .bc-sep {
+    color: #b0b0b8;
+    font-size: 13px;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+/* Sottocartelle inline — modalità lista */
+#subfolder-list.list .folder-card {
+    flex-direction: row;
+    align-items: center;
+    padding: 10px 15px;
+    text-align: left;
+}
+#subfolder-list.list .folder-card .folder-icon {
+    font-size: 24px;
+    margin-bottom: 0;
+    margin-right: 12px;
+}
+#subfolder-list.list .folder-card .folder-actions {
+    margin-top: 0;
+    margin-left: auto;
+}
+
+/* Sottocartelle inline — modalità griglia */
+#subfolder-list.grid .folder-card {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 15px;
+}
+#subfolder-list.grid .folder-card .folder-icon {
+    font-size: 32px;
+    margin-bottom: 6px;
+    margin-right: 0;
+}
+#subfolder-list.grid .folder-card .folder-actions {
+    margin-top: 8px;
+    margin-left: 0;
+    justify-content: center;
+}
+
+/* ── Barra azioni multi-selezione ── */
+#multi-action-bar {
+    display: none;
+    position: fixed;
+bottom: 16px;
+left: 50%;
+transform: translateX(-50%);
+z-index: 500;
+width: calc(100% - 40px);
+max-width: 700px;
+margin: 0;
+    background: white;
+    color: #1c1c1e;
+    border: 1px solid #e5e5ea;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+    border-radius: 16px;
+    padding: 10px 14px;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    
+}
+#multi-action-bar.visible { display: flex; }
+#multi-action-bar .sel-count {
+    font-size: 13px;
+    font-weight: 600;
+    color: #3a3a3c;
+    flex: 1;
+    min-width: 80px;
+}
+#multi-action-bar button {
+    padding: 8px 11px;
+    font-size: 12px;
+    border-radius: 10px;
+    background: transparent;
+    color: #3a3a3c;
+    border: 1px solid #3a3a3c;
+}
+#multi-action-bar button.act-danger { background: transparent; color: #ff3b30; border: 1px solid #ff3b30; }
+#multi-action-bar button.act-cut    { background: transparent; color: #cc7a00; border: 1px solid #cc7a00; }
+#multi-action-bar button.act-copy   { background: transparent; color: #248a3d; border: 1px solid #248a3d; }
+#multi-action-bar button.act-paste  { background: transparent; color: #007aff; border: 1px solid #007aff; }
+#multi-action-bar button.act-download { background: transparent; color: #007aff; border: 1px solid #007aff; }
+#multi-action-bar button.act-close { background: var(--secondary-btn) !important; color: #3a3a3c; border: 1px solid transparent; }
+#folders-view .folder-actions button:first-child,
+#subfolder-list .folder-actions button:first-child { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+
+#multi-action-bar.visible ~ #fab-main,
+        body.multi-active #fab-main {
+            bottom: 100px;
+        }
+        #fab-main { transition: bottom 0.2s ease; }
+    </style>
+</head>
+<body onclick="deselectAll(event)">
+
+    <!-- Sticky Folder Header (shown when inside a folder) -->
+    <div id="folder-view-header" onclick="event.stopPropagation()">
+        <div class="folder-header-top">
+            <button id="folder-back-btn" onclick="goBackFromFolder()">‹ Indietro</button>
+            <span id="folder-title-label"></span>
+            <div class="view-toggle-row">
+                <button onclick="changeFolderView('grid')" title="Griglia">🔳</button>
+                <button onclick="changeFolderView('list')" title="Lista">≡</button>
+            </div>
+            
+        </div>
+        <div class="menu-overlay" id="folder-menu-overlay" onclick="closeFolderMenu()"></div>
+    </div>
+
+    <header id="main-header" onclick="event.stopPropagation()">
+        <div class="header-top-row">
+            
+            <h1>Archivio Digitale</h1>
+            <div class="view-toggle-row">
+                <button onclick="changeView('grid')" title="Griglia">🔳</button>
+                <button onclick="changeView('list')" title="Lista">≡</button>
+            </div>
+            <a href="https://asarritzu-boop.github.io/Compressor/" class="header-ext-link" title="Compressor" onclick="event.stopPropagation()">🗜️</a>
+        </div>
+
+        <div class="search-inner">
+                <input type="text" id="search-bar" list="search-suggestions" class="search-input" placeholder="Cerca nell'archivio..." oninput="filterArchive()">
+                <datalist id="search-suggestions"></datalist>
+                <button id="clear-search" class="clear-search" onclick="clearSearch()">✕</button>
+            </div>
+            
+    </header>
+    <div id="fab-main" style="position:fixed;bottom:24px;right:20px;z-index:600;">
+        <button id="menu-toggle" onclick="toggleMenu(event)" title="Menu"
+            style="width:52px;height:52px;border-radius:50%;background:#007aff;color:white;border:none;font-size:22px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">☰</button>
+    </div>
+    
+    </div>
+    <div id="header-menu" onclick="event.stopPropagation()">
+        <!-- Voci home (nascoste in cartella) -->
+        <div id="menu-group-home">
+            <button class="menu-item" onclick="createNewFolder(); closeMenu()">📁 &nbsp;Nuova Cartella</button>
+            <button class="menu-item" onclick="document.getElementById('file-input-home').click(); closeMenu()">📎 &nbsp;Aggiungi File</button>
+            <button class="menu-item purple" onclick="openArticleModal(null); closeMenu()">✏️ &nbsp;Nuovo Articolo</button>
+        </div>
+        <!-- Voci cartella (nascoste in home) -->
+        <div id="menu-group-folder" style="display:none;">
+            <button class="menu-item" onclick="createSubfolder(); closeMenu()">📁 &nbsp;Nuova Sottocartella</button>
+            <button class="menu-item" onclick="document.getElementById('file-input').click(); closeMenu()">📎 &nbsp;Aggiungi File</button>
+            
+            <button class="menu-item purple" onclick="openArticleModal(currentFolderId); closeMenu()">✏️ &nbsp;Nuovo Articolo</button>
+        </div>
+        <div class="menu-separator"></div>
+        <button class="menu-item green" id="btn-save" onclick="saveArchive(); closeMenu()">💾 &nbsp;Salva</button>
+        <button class="menu-item green" onclick="salvaComeArchivio(); closeMenu()">📝 &nbsp;Salva come...</button>
+        <button class="menu-item" onclick="exportBackup(); closeMenu()">📤 &nbsp;Esporta Backup</button>
+        <button class="menu-item" onclick="document.getElementById('backup-input').click(); closeMenu()">📥 &nbsp;Importa Backup</button>
+        <input type="file" id="backup-input" accept=".json" onchange="importBackup(event)" style="display:none;">
+        <div class="menu-separator"></div>
+        <button class="menu-item danger" onclick="emptyArchive(); closeMenu()">🗑️ &nbsp;Svuota Archivio</button>
+    
+    </div>
+    <div class="menu-overlay" id="menu-overlay" onclick="closeMenu()"></div>
+        <div class="search-container" onclick="event.stopPropagation()" style="position:relative; top:auto; left:auto; right:auto; background:transparent; backdrop-filter:none; border-bottom:none; padding: 8px 0;">
+            
+        </div>
+
+        <!-- Hidden inputs kept for functionality -->
+        
+
+    <div id="folders-view" class="folders-container grid"></div>
+<ul id="free-files-view" style="display:none;"></ul>
+<div id="free-articles-view"></div>
+<div id="multi-action-bar" onclick="event.stopPropagation()">
+    <span class="sel-count" id="sel-count-label">0 selezionati</span>
+    <button class="act-download" onclick="multiDownload()">⬇️ Scarica</button>
+    <button class="act-cut"    onclick="multiCut()">✂️ Taglia</button>
+    <button class="act-copy"   onclick="multiCopy()">📋 Copia</button>
+    <button class="act-paste"  onclick="multiPaste()" id="btn-paste" style="display:none;">📌 Incolla</button>
+    <button class="act-danger" onclick="multiDelete()">🗑️ Elimina</button>
+    <button class="act-close" onclick="deselectAll(null)">✕</button>
+</div>
+    <div id="folder-view" onclick="event.stopPropagation()">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; gap:10px;">
+            <div id="breadcrumb-bar"></div>
+        </div>
+        
+        <!-- Hidden inputs/buttons needed for JS functionality -->
+        <div style="display:none;">
+            <button class="btn-outline-blue" onclick="document.getElementById('file-input').click()">＋ File</button>
+            <button class="secondary" onclick="createSubfolder()">📁 Sottocartella</button>
+            <button class="btn-outline-purple" onclick="openArticleModal(currentFolderId)">＋ Articolo</button>
+        </div>
+        <input type="file" id="file-input" multiple onchange="handleFileUpload(event)" style="display:none;">
+        <button id="btn-paste-inner" class="btn-outline-blue" onclick="multiPaste()" style="display:none;">📌 Incolla qui</button>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-bottom:15px; display:none;">
+            <button class="secondary" onclick="changeFolderView('grid')">🔳</button>
+            <button class="secondary" onclick="changeFolderView('list')">≡</button>
+        </div>
+
+<div id="subfolder-list" class="folders-container grid" style="margin-bottom:15px;"></div>
+<div id="article-list-folder"></div>
+        <ul class="file-list" id="file-list"></ul>
+    </div>
+
+    <!-- Modale Anteprima -->
+    <div id="preview-modal" onclick="closePreview()">
+        <div id="preview-bar" onclick="event.stopPropagation()">
+            <span id="preview-title"></span>
+            <button onclick="downloadCurrentPreview()">⬇️ Scarica</button>
+            <button class="close-btn" onclick="closePreview()">✕ Chiudi</button>
+        </div>
+        <div id="preview-body" onclick="event.stopPropagation()"></div>
+    </div>
+
+    <script id="archive-data-script">
+        window.ARCHIVE_DATA = window.ARCHIVE_DATA || { folders: [], freeFiles: [], freeArticles: [], viewMode: 'grid' };
+    </script>
+
+    <script id="app-script">
+                const ArchiveCrypto = {
+            async deriveKey(password, salt) {
+                const enc = new TextEncoder();
+                const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
+                return crypto.subtle.deriveKey(
+                    { name: "PBKDF2", salt: salt, iterations: 100000, hash: "SHA-256" },
+                    keyMaterial, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
+                );
+            },
+            async encryptData(plainText, password) {
+                const enc = new TextEncoder();
+                const salt = crypto.getRandomValues(new Uint8Array(16));
+                const iv = crypto.getRandomValues(new Uint8Array(12));
+                const key = await this.deriveKey(password, salt);
+                const cipherBuffer = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, enc.encode(plainText));
+                
+                const toB64 = buf => {
+                    let bin = '';
+                    const bytes = new Uint8Array(buf);
+                    for(let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+                    return btoa(bin);
+                };
+                return JSON.stringify({ salt: toB64(salt), iv: toB64(iv), data: toB64(cipherBuffer) });
+            },
+            async decryptData(payloadJSON, password) {
+                const payload = JSON.parse(payloadJSON);
+                const fromB64 = b64 => {
+                    const bin = atob(b64);
+                    const bytes = new Uint8Array(bin.length);
+                    for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                    return bytes;
+                };
+                const key = await this.deriveKey(password, fromB64(payload.salt));
+                const decryptedBuffer = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(payload.iv) }, key, fromB64(payload.data));
+                return new TextDecoder().decode(decryptedBuffer);
+            }
+        };
+
+                // Gestione dell'avvio con o senza password
+                async function inizializzaApp() {
+            const payloadEl = document.getElementById('archive-crypto-payload');
+            const payloadJSON = payloadEl ? payloadEl.textContent.trim() : '';
+
+            if (payloadJSON) {
+                document.body.style.visibility = 'hidden';
+                const overlay = document.createElement('div');
+                overlay.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg-color);z-index:999999;display:flex;align-items:center;justify-content:center;`;
+                overlay.innerHTML = `
+                    <div style="background:white;border-radius:16px;padding:32px 26px;width:300px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.1);border:1px solid #e5e5ea;">
+                        <div style="font-size:40px;margin-bottom:10px;">🔐</div>
+                        <div style="font-size:16px;font-weight:600;margin-bottom:6px;">Archivio Protetto</div>
+                        <div style="font-size:13px;color:#86868b;margin-bottom:18px;">Inserisci la password</div>
+                        <div style="position:relative;margin-bottom:8px;">
+                            <input id="arc-pwd-unlock" type="password" placeholder="Password..." style="width:100%;padding:12px;border:1px solid #d1d1d6;border-radius:10px;font-size:16px;box-sizing:border-box;text-align:center;outline:none;">
+                            <span id="toggle-view" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;opacity:0.5;">👁️</span>
+                        </div>
+                        <div id="arc-pwd-err" style="color:var(--danger);font-size:12px;min-height:16px;margin-bottom:12px;"></div>
+                        <button id="arc-btn-sblocca" style="padding:12px;background:var(--accent);color:white;border:none;border-radius:10px;font-size:14px;cursor:pointer;font-weight:600;width:100%;">Apri</button>
+                    </div>`;
+                document.documentElement.appendChild(overlay);
+
+                // Logica Occhio
+                const input = overlay.querySelector('#arc-pwd-unlock');
+                overlay.querySelector('#toggle-view').onclick = () => {
+                    input.type = input.type === 'password' ? 'text' : 'password';
+                };
+
+                async function verifica() {
+                    const pwd = input.value;
+                    try {
+                        const jsonDecriptato = await ArchiveCrypto.decryptData(payloadJSON, pwd);
+                        window.ARCHIVE_DATA = JSON.parse(jsonDecriptato);
+                        overlay.remove();
+                        document.body.style.visibility = 'visible';
+                        renderFolders();
+                        renderFreeFiles();
+                        renderFreeArticles();
+                    } catch (err) {
+                        document.getElementById('arc-pwd-err').textContent = 'Password errata';
+                        input.value = '';
+                    }
+                }
+                document.getElementById('arc-btn-sblocca').onclick = verifica;
+                input.onkeydown = e => { if(e.key==='Enter') verifica(); };
+            } else {
+                renderFolders();
+                renderFreeFiles();
+                renderFreeArticles();
+            }
+        }
+
+
+        window.onload = inizializzaApp;
+        
+        let currentFolderId = null;
+        let fileHandleSalvataggio = null;
+        let folderStack = []; // stack per navigazione: [{id, name}, ...]
+
+        // --- HELPER: trova una cartella (anche annidita) per ID ---
+        function getFolderById(id, list) {
+            list = list || window.ARCHIVE_DATA.folders;
+            for (const f of list) {
+                if (f.id === id) return f;
+                if (f.subfolders && f.subfolders.length) {
+                    const found = getFolderById(id, f.subfolders);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+
+        // --- CREA SOTTOCARTELLA nella cartella corrente ---
+        function createSubfolder() {
+            const name = prompt("Nome sottocartella:");
+            if (!name) return;
+            const parent = getFolderById(currentFolderId);
+            if (!parent.subfolders) parent.subfolders = [];
+            parent.subfolders.push({ id: 'f_' + Date.now(), name: name.trim(), files: [], subfolders: [] });
+            renderFiles();
+        }
+
+        // --- NAVIGA a un livello nella breadcrumb ---
+        function navigateToBreadcrumb(index) {
+            folderStack = folderStack.slice(0, index + 1);
+            currentFolderId = folderStack[folderStack.length - 1].id;
+            renderFiles();
+        }
+
+// --- RINOMINA FILE ---
+        function renameFile(event, id) {
+            event.stopPropagation();
+            const folder = getFolderById(currentFolderId);
+            const file = folder.files.find(f => f.id === id);
+            const ext = file.name.includes('.') ? '.' + file.name.split('.').pop() : '';
+            const base = file.name.replace(/\.[^.]+$/, '');
+            const n = prompt("Nuovo nome:", base);
+            if (n && n.trim()) { file.name = n.trim() + ext; renderFiles(); }
+        }
+        
+        // --- RINOMINA SOTTOCARTELLA ---
+        function renameSubfolder(event, id) {
+            event.stopPropagation();
+            const parent = getFolderById(currentFolderId);
+            const sub = (parent.subfolders || []).find(s => s.id === id);
+            const n = prompt("Nuovo nome:", sub.name);
+            if (n) { sub.name = n.trim(); renderFiles(); }
+        }
+
+        // --- ELIMINA SOTTOCARTELLA ---
+        function deleteSubfolder(event, id) {
+            event.stopPropagation();
+            if (!confirm("Eliminare sottocartella e tutto il contenuto?")) return;
+            const parent = getFolderById(currentFolderId);
+            parent.subfolders = (parent.subfolders || []).filter(s => s.id !== id);
+            renderFiles();
+        }
+
+        // Converte la stringa Base64 in un buffer binario (indispensabile per Mammoth e PDF.js)
+        function base64ToArrayBuffer(base64) {
+            const binaryString = window.atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        // MOTORE DI CARICAMENTO LIBRERIE (Online/Offline)
+        async function loadLibrary(id, globalVar, cdnUrl) {
+            if (window[globalVar]) return window[globalVar]; // Già in memoria
+
+            return new Promise((resolve, reject) => {
+                const el = document.getElementById(id);
+                const code = el ? el.textContent.trim() : '';
+                const script = document.createElement('script');
+                
+                script.onload = () => resolve(window[globalVar]);
+                script.onerror = () => reject(new Error('Errore caricamento: ' + id));
+
+                if (code) {
+                    // Siamo nel clone offline: "sveglia" il codice archiviato
+                    const blob = new Blob([code], { type: 'application/javascript' });
+                    script.src = URL.createObjectURL(blob);
+                } else {
+                    // Primo avvio online: scarica da internet
+                    script.src = cdnUrl;
+                }
+                document.head.appendChild(script);
+            });
+        }
+        
+        function sortAlpha(arr, key) {
+    return arr.sort((a, b) => a[key].localeCompare(b[key], 'it', { sensitivity: 'base' }));
+}
+
+        function renderFolders(filter = "") {
+            const container = document.getElementById('folders-view');
+            container.innerHTML = '';
+            container.className = `folders-container ${window.ARCHIVE_DATA.viewMode || 'grid'}`;
+
+            const filtered = window.ARCHIVE_DATA.folders.filter(f => 
+                f.name.toLowerCase().includes(filter.toLowerCase()) || 
+                f.files.some(file => file.name.toLowerCase().includes(filter.toLowerCase()))
+            );
+sortAlpha(filtered, 'name');
+            filtered.forEach(folder => {
+                const card = document.createElement('div');
+                card.className = 'folder-card';
+                card.dataset.folderId = folder.id;
+                card.onclick = (e) => selectItem(e, card);
+                card.ondblclick = () => openFolder(folder.id, folder.name);
+                
+                card.innerHTML = `
+                    <div class="folder-icon">📂</div>
+                    <div style="flex-grow:1; text-align:inherit;">
+                        <div class="folder-name">${folder.name}</div>
+                        <div class="folder-count">${folder.files.length} file · ${(folder.subfolders||[]).length} cartelle · ${(folder.articles||[]).length} articoli</div>
+                    </div>
+                    <div class="folder-actions">
+                        <button onclick="openFolder('${folder.id}','${folder.name.replace(/'/g,"\\'")}')">Apri</button>
+                        <button class="secondary" onclick="renameFolder(event, '${folder.id}')">Rinomina</button>
+                        
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            refreshPasteButton();
+        }
+        
+        
+        function renderFreeFiles() {
+    const list = document.getElementById('free-files-view');
+    const freeFiles = window.ARCHIVE_DATA.freeFiles || [];
+    if (!freeFiles.length) { list.style.display = 'none'; return; }
+    const mode = window.ARCHIVE_DATA.viewMode || 'list';
+    list.className = `file-list ${mode}`;
+    list.style.display = mode === 'grid' ? 'grid' : 'block';
+    list.style.maxWidth = '1000px';
+list.style.margin = '15px auto 0 auto';
+    list.innerHTML = '';
+    sortAlpha(freeFiles, 'name');
+    freeFiles.forEach(file => {
+        const li = document.createElement('li');
+        li.className = 'file-item';
+        li.dataset.fileId = file.id;
+        li.onclick = (e) => selectItem(e, li);
+        li.innerHTML = `
+            <div class="file-icon" style="font-size:28px;flex-shrink:0;">${getFileIcon(file.name)}</div>
+            <div class="file-info">
+                <div class="file-name">${file.name}</div>
+                <div class="file-size">${(file.size/1024).toFixed(1)} KB</div>
+            </div>
+            <div class="file-actions">
+                <button onclick="previewFreeFile('${file.id}')">👁️</button>
+                <button class="secondary" onclick="renameFreeFile(event,'${file.id}')">Rinomina</button>
+            </div>
+                
+            </div>`;
+        list.appendChild(li);
+    });
+}
+
+function renameFreeFile(event, id) {
+            event.stopPropagation();
+            const file = (window.ARCHIVE_DATA.freeFiles || []).find(f => f.id === id);
+            const ext = file.name.includes('.') ? '.' + file.name.split('.').pop() : '';
+            const base = file.name.replace(/\.[^.]+$/, '');
+            const n = prompt("Nuovo nome:", base);
+            if (n && n.trim()) { file.name = n.trim() + ext; renderFreeFiles(); }
+        }
+        
+function downloadFreeFile(id) {
+    const file = window.ARCHIVE_DATA.freeFiles.find(f => f.id === id);
+    if (!file) return;
+    const a = document.createElement('a'); a.href = file.data; a.download = file.name; a.click();
+}
+
+function deleteFreeFile(id) {
+    if (!confirm("Eliminare questo file?")) return;
+    window.ARCHIVE_DATA.freeFiles = window.ARCHIVE_DATA.freeFiles.filter(f => f.id !== id);
+    renderFreeFiles();
+    renderFreeArticles();
+}
+
+function previewFreeFile(id) {
+    const prev = currentFolderId;
+    window.ARCHIVE_DATA._freeFileTemp = window.ARCHIVE_DATA.freeFiles.find(f => f.id === id);
+    previewFile(id, true);
+}
+
+        function filterArchive() {
+            const val = document.getElementById('search-bar').value.trim();
+            document.getElementById('clear-search').style.display = val ? 'flex' : 'none';
+
+            if (!val) {
+                // Torna alla vista cartelle normale
+                document.getElementById('folders-view').style.display = '';
+                document.getElementById('search-results-view') && (document.getElementById('search-results-view').remove());
+                renderFolders();
+                return;
+            }
+            
+            
+
+            const searchLower = val.toLowerCase();
+
+            // Raccoglie tutti i file corrispondenti da tutte le cartelle (incluse sottocartelle)
+            const matches = [];
+            function searchInFolder(folder, path) {
+                folder.files.forEach(file => {
+                    if (file.name.toLowerCase().includes(searchLower)) {
+                        matches.push({ file, folderName: path, folderId: folder.id });
+                    }
+                });
+                (folder.subfolders || []).forEach(sub => searchInFolder(sub, path + ' › ' + sub.name));
+            }
+            window.ARCHIVE_DATA.folders.forEach(folder => searchInFolder(folder, folder.name));
+            // Cerca anche fra gli articoli liberi
+            (window.ARCHIVE_DATA.freeArticles || []).forEach(art => {
+                if (art.label.toLowerCase().includes(searchLower) || art.url.toLowerCase().includes(searchLower)) {
+                    matches.push({ art, folderName: '🏠 Home' });
+                }
+            });
+            // Cerca articoli dentro le cartelle
+            function searchArticlesInFolder(folder, path) {
+                (folder.articles || []).forEach(art => {
+                    if (art.label.toLowerCase().includes(searchLower) || art.url.toLowerCase().includes(searchLower)) {
+                        matches.push({ art, folderName: path, folderId: folder.id });
+                    }
+                });
+                (folder.subfolders || []).forEach(sub => searchArticlesInFolder(sub, path + ' › ' + sub.name));
+            }
+            window.ARCHIVE_DATA.folders.forEach(folder => searchArticlesInFolder(folder, folder.name));
+
+            // Nasconde la griglia cartelle e mostra la lista risultati
+            document.getElementById('folders-view').style.display = 'none';
+
+            let resultsView = document.getElementById('search-results-view');
+            if (!resultsView) {
+                resultsView = document.createElement('div');
+                resultsView.id = 'search-results-view';
+                resultsView.style.cssText = 'max-width:900px;margin:0 auto;background:white;border-radius:16px;padding:20px;box-shadow:0 4px 20px rgba(0,0,0,0.08);';
+                document.getElementById('folders-view').insertAdjacentElement('afterend', resultsView);
+            }
+
+            if (!matches.length) {
+                resultsView.innerHTML = `<p style="text-align:center;padding:20px;color:#888;">Nessun file trovato per "<b>${val}</b>"</p>`;
+                return;
+            }
+
+            resultsView.innerHTML = `<p style="font-size:13px;color:#86868b;margin-bottom:12px;">${matches.length} risultat${matches.length === 1 ? 'o' : 'i'} per "<b>${val}</b>"</p>`;
+            const ul = document.createElement('ul');
+            ul.className = 'file-list';
+
+            matches.forEach(({file, art, folderName, folderId}) => {
+                const li = document.createElement('li');
+                li.className = 'file-item';
+                if (art) {
+                    li.dataset.articleId = art.id;
+                    li.innerHTML = `
+                        <div class="file-info">
+                            <div class="file-name">🔗 ${art.label}</div>
+                            <div class="file-size">${folderName}</div>
+                        </div>
+                        <div class="file-actions" style="display:flex;">
+                            <button onclick="openArticlePreview('${art.id}','${folderId||''}')">Apri</button>
+                        </div>`;
+                } else {
+                    li.dataset.fileId = file.id;
+                    li.innerHTML = `
+                        <div class="file-info">
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-size">${(file.size/1024).toFixed(1)} KB &nbsp;·&nbsp; 📂 ${folderName}</div>
+                        </div>
+                        <div class="file-actions" style="display:flex;">
+                            <button onclick="previewFileFromFolder('${file.id}','${folderId}')">👁️</button>
+                            <button class="secondary" onclick="downloadFileFromFolder('${file.id}','${folderId}')">⬇️</button>
+                        </div>`;
+                }
+                ul.appendChild(li);
+            });
+
+            resultsView.appendChild(ul);
+        }
+
+        function previewFileFromFolder(fileId, folderId) {
+            const prev = currentFolderId;
+            currentFolderId = folderId;
+            previewFile(fileId);
+            currentFolderId = prev;
+        }
+
+        function downloadFileFromFolder(fileId, folderId) {
+            const folder = getFolderById(folderId);
+            const file = folder.files.find(f => f.id === fileId);
+            const a = document.createElement('a'); a.href = file.data; a.download = file.name; a.click();
+        }
+
+        function clearSearch() {
+            document.getElementById('search-bar').value = '';
+            const rv = document.getElementById('search-results-view');
+            if (rv) rv.remove();
+            document.getElementById('folders-view').style.display = '';
+            renderFolders();
+        }
+
+        function changeView(mode) {
+    window.ARCHIVE_DATA.viewMode = mode;
+    renderFolders();
+    renderFreeFiles();
+    renderFreeArticles();
+}
+        
+        function changeFolderView(mode) {
+    window.ARCHIVE_DATA.folderViewMode = mode;
+    renderFiles();
+}
+
+function getFileIcon(name) {
+    const ext = name.split('.').pop().toLowerCase();
+    const icons = {
+        pdf: '📄', doc: '📝', docx: '📝', xls: '📊', xlsx: '📊',
+        ppt: '📑', pptx: '📑', jpg: '🖼️', jpeg: '🖼️', png: '🖼️',
+        gif: '🖼️', mp3: '🎵', mp4: '🎬', zip: '🗜️', txt: '📃'
+    };
+    return icons[ext] || '📎';
+}
+        function selectItem(event, element) {
+    event.stopPropagation();
+    element.classList.toggle('selected');
+    updateMultiBar();
+}
+
+function deselectAll(event) {
+    if (event) event.stopPropagation();
+    document.querySelectorAll('.folder-card.selected, .file-item.selected, .article-item.selected')
+        .forEach(el => el.classList.remove('selected'));
+    updateMultiBar();
+}
+
+let clipboard = { items: [], mode: null };
+
+function getSelectedItems() {
+    const files    = Array.from(document.querySelectorAll('.file-item.selected'));
+    const folders  = Array.from(document.querySelectorAll('.folder-card.selected'));
+    const articles = Array.from(document.querySelectorAll('.article-item.selected'));
+    return { files, folders, articles, total: files.length + folders.length + articles.length };
+}
+
+function updateMultiBar() {
+    const { files, folders, articles, total } = getSelectedItems();
+    const bar   = document.getElementById('multi-action-bar');
+    const label = document.getElementById('sel-count-label');
+    if (total > 0) {
+        bar.classList.add('visible');
+        document.getElementById('fab-main').style.bottom = '100px';
+        document.getElementById('header-menu').style.bottom = '160px';
+        const parts = [];
+        if (files.length)    parts.push(files.length + ' file');
+        if (folders.length)  parts.push(folders.length + ' cartel' + (folders.length > 1 ? 'le' : 'la'));
+        if (articles.length) parts.push(articles.length + ' articol' + (articles.length > 1 ? 'i' : 'o'));
+        label.textContent = parts.join(' + ') + ' selezionat' + (total > 1 ? 'i' : 'o');
+    } else {
+        bar.classList.remove('visible');
+        document.getElementById('fab-main').style.bottom = '24px';
+        document.getElementById('header-menu').style.bottom = '84px';
+    }
+    refreshPasteButton();
+}
+
+function refreshPasteButton() {
+    const has = clipboard.items.length > 0;
+    const b1  = document.getElementById('btn-paste');
+    const b2  = document.getElementById('btn-paste-inner');
+    if (b1) b1.style.display = has ? '' : 'none';
+    if (b2) b2.style.display = has ? '' : 'none';
+}
+
+function showToast(msg) {
+    const t = document.createElement('div');
+    t.style.cssText = `position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1c1c1e;color:white;padding:10px 20px;border-radius:20px;font-size:14px;z-index:99999;box-shadow:0 4px 16px rgba(0,0,0,0.3);pointer-events:none;`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2200);
+}
+
+function collectClipboardItems(fileLis, folderCards, articleDivs) {
+    const result = [];
+    fileLis.forEach(li => {
+        const id = li.dataset.fileId;
+        let file = currentFolderId
+            ? getFolderById(currentFolderId).files.find(f => f.id === id)
+            : (window.ARCHIVE_DATA.freeFiles || []).find(f => f.id === id);
+        if (file) result.push({ type:'file', data: JSON.parse(JSON.stringify(file)), sourceFolder: currentFolderId });
+    });
+    folderCards.forEach(card => {
+        const fid = card.dataset.folderId;
+        if (!fid) return;
+        const f = getFolderById(fid) || window.ARCHIVE_DATA.folders.find(x => x.id === fid);
+        if (f) result.push({ type:'folder', data: JSON.parse(JSON.stringify(f)), sourceParent: currentFolderId });
+    });
+    (articleDivs || []).forEach(div => {
+        const aid = div.dataset.articleId;
+        const arr = currentFolderId
+            ? (getFolderById(currentFolderId).articles || [])
+            : (window.ARCHIVE_DATA.freeArticles || []);
+        const art = arr.find(a => a.id === aid);
+        if (art) result.push({ type:'article', data: JSON.parse(JSON.stringify(art)), sourceFolder: currentFolderId });
+    });
+    return result;
+}
+
+function multiDownload() {
+    const { files, folders } = getSelectedItems();
+    files.forEach(li => {
+        const id = li.dataset.fileId;
+        const file = currentFolderId
+            ? getFolderById(currentFolderId).files.find(f => f.id === id)
+            : (window.ARCHIVE_DATA.freeFiles || []).find(f => f.id === id);
+        if (file) { const a = document.createElement('a'); a.href = file.data; a.download = file.name; a.click(); }
+    });
+    folders.forEach(card => {
+        const fid = card.dataset.folderId;
+        if (fid) downloadFolder({ stopPropagation: () => {} }, fid);
+    });
+}
+
+function multiCopy() {
+    const { files, folders, articles, total } = getSelectedItems();
+    if (!total) return;
+    clipboard = { items: collectClipboardItems(files, folders, articles), mode: 'copy' };
+    showToast('📋 ' + clipboard.items.length + ' element' + (clipboard.items.length > 1 ? 'i copiati' : 'o copiato'));
+    refreshPasteButton();
+}
+
+function multiCut() {
+    const { files, folders, articles, total } = getSelectedItems();
+    if (!total) return;
+    clipboard = { items: collectClipboardItems(files, folders, articles), mode: 'cut' };
+    document.querySelectorAll('.file-item.selected, .folder-card.selected, .article-item.selected')
+        .forEach(el => el.style.opacity = '0.45');
+    showToast('✂️ ' + clipboard.items.length + ' element' + (clipboard.items.length > 1 ? 'i tagliati' : 'o tagliato') + ' — scegli destinazione');
+    refreshPasteButton();
+}
+
+function removeFileFromArchive(fileId, sourceFolderId) {
+    if (sourceFolderId) {
+        const f = getFolderById(sourceFolderId);
+        if (f) f.files = f.files.filter(x => x.id !== fileId);
+    } else {
+        window.ARCHIVE_DATA.freeFiles = (window.ARCHIVE_DATA.freeFiles || []).filter(x => x.id !== fileId);
+    }
+}
+
+function removeFolderFromArchive(folderId, parentId) {
+    if (parentId) {
+        const p = getFolderById(parentId);
+        if (p && p.subfolders) p.subfolders = p.subfolders.filter(x => x.id !== folderId);
+    } else {
+        window.ARCHIVE_DATA.folders = window.ARCHIVE_DATA.folders.filter(x => x.id !== folderId);
+    }
+}
+
+function pickPasteDestination() {
+    return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:99999;display:flex;align-items:center;justify-content:center;`;
+        const folders = window.ARCHIVE_DATA.folders;
+        overlay.innerHTML = `
+            <div style="background:white;border-radius:16px;padding:24px;width:300px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 30px rgba(0,0,0,0.25);">
+                <div style="font-size:17px;font-weight:700;margin-bottom:6px;text-align:center;">📌 Dove incollare?</div>
+                <div style="font-size:13px;color:#86868b;margin-bottom:16px;text-align:center;">Scegli la destinazione</div>
+                <div id="paste-dest-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+                <button id="btn-paste-root" style="margin-top:12px;width:100%;padding:11px;background:#e8e8ed;color:#333;border:none;border-radius:10px;font-size:14px;cursor:pointer;font-weight:600;">🏠 Schermata iniziale</button>
+                <button id="btn-paste-cancel" style="margin-top:8px;width:100%;padding:10px;background:transparent;color:#888;border:none;font-size:14px;cursor:pointer;">Annulla</button>
+            </div>`;
+        document.body.appendChild(overlay);
+        overlay.querySelector('#paste-dest-list').append(
+            ...folders.map(f => {
+                const btn = document.createElement('button');
+                btn.style.cssText = `width:100%;padding:12px;background:var(--accent);color:white;border:none;border-radius:10px;font-size:14px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px;`;
+                btn.innerHTML = `<span>📂</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.name}</span>`;
+                btn.onclick = () => { overlay.remove(); resolve(f.id); };
+                return btn;
+            })
+        );
+        overlay.querySelector('#btn-paste-root').onclick   = () => { overlay.remove(); resolve(null); };
+        overlay.querySelector('#btn-paste-cancel').onclick = () => { overlay.remove(); resolve(false); };
+    });
+}
+
+async function multiPaste() {
+    if (!clipboard.items.length) return;
+    let destFolderId = currentFolderId;
+    if (!currentFolderId && window.ARCHIVE_DATA.folders.length > 0) {
+        const choice = await pickPasteDestination();
+        if (choice === false) return;
+        destFolderId = choice;
+    }
+    clipboard.items.forEach(item => {
+        if (item.type === 'file') {
+            const newFile = JSON.parse(JSON.stringify(item.data));
+            if (clipboard.mode === 'copy') {
+    newFile.id = 'fi_' + Date.now() + Math.random();
+                const ext  = newFile.name.includes('.') ? '.' + newFile.name.split('.').pop() : '';
+                const base = newFile.name.replace(/\.[^.]+$/, '');
+                newFile.name = base + '_copia' + ext;
+            }
+            if (destFolderId) getFolderById(destFolderId).files.push(newFile);
+            else { if (!window.ARCHIVE_DATA.freeFiles) window.ARCHIVE_DATA.freeFiles = []; window.ARCHIVE_DATA.freeFiles.push(newFile); }
+        } else if (item.type === 'folder') {
+            const newFolder = JSON.parse(JSON.stringify(item.data));
+            if (clipboard.mode === 'copy') {
+                (function reassign(f) { f.id = 'f_' + Date.now() + Math.random(); (f.subfolders||[]).forEach(reassign); })(newFolder);
+            }
+            if (destFolderId) { const d = getFolderById(destFolderId); if (!d.subfolders) d.subfolders = []; d.subfolders.push(newFolder); }
+            else window.ARCHIVE_DATA.folders.push(newFolder);
+        } else if (item.type === 'article') {
+            const newArt = JSON.parse(JSON.stringify(item.data));
+            if (clipboard.mode === 'copy') newArt.id = 'art_' + Date.now() + Math.random();
+            if (destFolderId) {
+                const d = getFolderById(destFolderId);
+                if (!d.articles) d.articles = [];
+                d.articles.push(newArt);
+            } else {
+                if (!window.ARCHIVE_DATA.freeArticles) window.ARCHIVE_DATA.freeArticles = [];
+                window.ARCHIVE_DATA.freeArticles.push(newArt);
+            }
+        }
+    });
+    if (clipboard.mode === 'cut') {
+        clipboard.items.forEach(item => {
+            if (item.type === 'file') removeFileFromArchive(item.data.id, item.sourceFolder);
+            else if (item.type === 'folder') removeFolderFromArchive(item.data.id, item.sourceParent);
+            else if (item.type === 'article') {
+                if (item.sourceFolder) { const f = getFolderById(item.sourceFolder); if (f) f.articles = (f.articles||[]).filter(a => a.id !== item.data.id); }
+                else window.ARCHIVE_DATA.freeArticles = (window.ARCHIVE_DATA.freeArticles||[]).filter(a => a.id !== item.data.id);
+            }
+        });
+        clipboard = { items: [], mode: null };
+    }
+    showToast('📌 Incollato!');
+    refreshPasteButton();
+    deselectAll(null);
+    if (currentFolderId) renderFiles();
+    else { renderFolders(); renderFreeFiles(); renderFreeArticles(); }
+}
+
+function multiDelete() {
+    const { files, folders, articles, total } = getSelectedItems();
+    if (!total) return;
+    if (!confirm(`Eliminare ${total} element${total > 1 ? 'i' : 'o'} selezionat${total > 1 ? 'i' : 'o'}?`)) return;
+    files.forEach(li => {
+        const id = li.dataset.fileId;
+        if (currentFolderId) { const f = getFolderById(currentFolderId); f.files = f.files.filter(x => x.id !== id); }
+        else window.ARCHIVE_DATA.freeFiles = (window.ARCHIVE_DATA.freeFiles || []).filter(x => x.id !== id);
+    });
+    folders.forEach(card => {
+        const fid = card.dataset.folderId;
+        if (!fid) return;
+        if (currentFolderId) { const p = getFolderById(currentFolderId); if (p.subfolders) p.subfolders = p.subfolders.filter(x => x.id !== fid); }
+        else window.ARCHIVE_DATA.folders = window.ARCHIVE_DATA.folders.filter(x => x.id !== fid);
+    });
+    articles.forEach(div => {
+        const aid = div.dataset.articleId;
+        if (currentFolderId) { const f = getFolderById(currentFolderId); f.articles = (f.articles||[]).filter(a => a.id !== aid); }
+        else window.ARCHIVE_DATA.freeArticles = (window.ARCHIVE_DATA.freeArticles||[]).filter(a => a.id !== aid);
+    });
+    deselectAll(null);
+    if (currentFolderId) renderFiles();
+    else { renderFolders(); renderFreeFiles(); renderFreeArticles();}
+}
+
+// ============================================================
+// ARTICOLI
+// ============================================================
+
+function openArticleModal(targetFolderId) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;`;
+    overlay.innerHTML = `
+        <div onclick="event.stopPropagation()" style="background:white;border-radius:16px;padding:28px 24px;width:320px;box-shadow:0 8px 30px rgba(0,0,0,0.25);">
+            <div style="font-size:32px;text-align:center;margin-bottom:8px;">🔗</div>
+            <div style="font-size:16px;font-weight:700;text-align:center;margin-bottom:18px;">Nuovo Articolo</div>
+            <label style="font-size:13px;color:#86868b;display:block;margin-bottom:4px;">Etichetta (nome visibile)</label>
+            <input id="art-label" type="text" placeholder="Es. Notizie del giorno" style="width:100%;padding:11px;border:1px solid #d1d1d6;border-radius:10px;font-size:15px;margin-bottom:14px;box-sizing:border-box;outline:none;">
+            <label style="font-size:13px;color:#86868b;display:block;margin-bottom:4px;">URL articolo</label>
+            <input id="art-url" type="url" placeholder="https://..." style="width:100%;padding:11px;border:1px solid #d1d1d6;border-radius:10px;font-size:15px;margin-bottom:20px;box-sizing:border-box;outline:none;">
+            <div id="art-err" style="color:#ff3b30;font-size:12px;min-height:14px;margin-top:-14px;margin-bottom:10px;"></div>
+            <div style="display:flex;gap:10px;">
+                <button id="art-cancel" style="flex:1;padding:11px;background:#e8e8ed;color:#333;border:none;border-radius:10px;font-size:14px;cursor:pointer;">Annulla</button>
+                <button id="art-confirm" style="flex:1;padding:11px;background:#8e44ad;color:white;border:none;border-radius:10px;font-size:14px;cursor:pointer;font-weight:600;">Aggiungi</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#art-cancel').onclick = () => overlay.remove();
+    overlay.querySelector('#art-confirm').onclick = () => {
+        const label = overlay.querySelector('#art-label').value.trim();
+        const url   = overlay.querySelector('#art-url').value.trim();
+        const err   = overlay.querySelector('#art-err');
+        if (!label) { err.textContent = 'Inserisci un\'etichetta.'; return; }
+        if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) { err.textContent = 'Inserisci un URL valido.'; return; }
+
+        const article = { id: 'art_' + Date.now(), label, url, pinned: false };
+
+        if (targetFolderId) {
+            const folder = getFolderById(targetFolderId);
+            if (!folder.articles) folder.articles = [];
+            folder.articles.push(article);
+            renderFiles();
+        } else {
+            if (!window.ARCHIVE_DATA.freeArticles) window.ARCHIVE_DATA.freeArticles = [];
+            window.ARCHIVE_DATA.freeArticles.push(article);
+            renderFreeArticles();
+        }
+        overlay.remove();
+        showToast('🔗 Articolo aggiunto');
+    };
+}
+
+function renderFreeArticles() {
+    const container = document.getElementById('free-articles-view');
+    if (!container) return;
+    const articles = (window.ARCHIVE_DATA.freeArticles || []);
+    container.innerHTML = '';
+    if (!articles.length) return;
+
+    const pinned   = articles.filter(a => a.pinned);
+    const unpinned = articles.filter(a => !a.pinned);
+    sortAlpha(pinned, 'label');
+    sortAlpha(unpinned, 'label');
+    const sorted   = [...pinned, ...unpinned];
+
+    const title = document.createElement('div');
+    title.className = 'article-section-title';
+    title.textContent = '🔗 Articoli';
+    container.appendChild(title);
+
+    sorted.forEach(art => {
+        container.appendChild(buildArticleItem(art, null));
+    });
+}
+
+function renderFolderArticles(folder) {
+    const container = document.getElementById('article-list-folder');
+    if (!container) return;
+    const articles = folder.articles || [];
+    container.innerHTML = '';
+    if (!articles.length) return;
+
+    const title = document.createElement('div');
+    title.style.cssText = 'font-size:12px;color:#86868b;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin:12px 0 6px 0;';
+    title.textContent = '🔗 Articoli';
+    container.appendChild(title);
+
+    const pinned   = articles.filter(a => a.pinned);
+    const unpinned = articles.filter(a => !a.pinned);
+    sortAlpha(pinned, 'label');
+    sortAlpha(unpinned, 'label');
+    [...pinned, ...unpinned].forEach(art => {
+        container.appendChild(buildArticleItem(art, currentFolderId));
+    });
+}
+
+function buildArticleItem(art, folderId) {
+    const div = document.createElement('div');
+    div.className = 'article-item';
+    div.dataset.articleId = art.id;
+
+    // Il tocco seleziona l'elemento (come per i file)
+    div.onclick = (e) => {
+        if (e.target.closest('.btn-delete-small')) return;
+        selectItem(e, div);
+    };
+
+    div.innerHTML = `
+        <span class="article-star ${art.pinned ? 'pinned' : ''}" title="${art.pinned ? 'Rimuovi da in alto' : 'Metti in cima'}">★</span>
+        <div class="file-info" style="flex-grow:1;min-width:0;">
+            <div class="file-name">🔗 ${art.label}</div>
+            
+        </div>
+        <div class="article-actions">
+            <button onclick="openArticlePreview('${art.id}','${folderId || ''}')">Apri</button>
+            <button class="secondary" onclick="renameArticle(event,'${art.id}','${folderId || ''}')">Rinomina</button>
+            <button class="danger" onclick="deleteArticle(event,'${art.id}','${folderId || ''}')">🗑️</button>
+        </div>`;
+
+    div.querySelector('.article-star').onclick = (e) => {
+        e.stopPropagation();
+        art.pinned = !art.pinned;
+        if (folderId) { renderFiles(); } else { renderFreeArticles(); }
+    };
+    return div;
+}
+
+function openArticlePreview(id, folderId) {
+    let art;
+    if (folderId) {
+        const f = getFolderById(folderId);
+        art = (f.articles || []).find(a => a.id === id);
+    } else {
+        art = (window.ARCHIVE_DATA.freeArticles || []).find(a => a.id === id);
+    }
+    
+    if (!art) return;
+
+    // Se l'articolo ha un URL, apri direttamente il browser
+    if (art.url) {
+        window.open(art.url, '_blank');
+    } else {
+        // Logica di riserva se fosse un articolo di testo interno
+        alert("URL non disponibile");
+    }
+}
+
+
+function showOfflineContent(id, folderId) {
+    let art;
+    if (folderId) {
+        const f = getFolderById(folderId);
+        art = (f.articles || []).find(a => a.id === id);
+    } else {
+        art = (window.ARCHIVE_DATA.freeArticles || []).find(a => a.id === id);
+    }
+    if (!art || !art.offlineContent) return;
+    const blob = new Blob([art.offlineContent], { type: 'text/html' });
+    const blobUrl = URL.createObjectURL(blob);
+    document.getElementById('preview-body').innerHTML =
+        `<iframe src="${blobUrl}" style="width:100%;height:100%;border:none;border-radius:10px;min-height:75vh;"></iframe>`;
+}
+
+function renameArticle(event, id, folderId) {
+    event.stopPropagation();
+    let art, arr;
+    if (folderId) {
+        const f = getFolderById(folderId);
+        arr = f.articles || [];
+    } else {
+        arr = window.ARCHIVE_DATA.freeArticles || [];
+    }
+    art = arr.find(a => a.id === id);
+    const n = prompt('Nuova etichetta:', art.label);
+    if (n && n.trim()) { art.label = n.trim(); }
+    const u = prompt('Nuovo URL:', art.url);
+    if (u && u.trim()) { art.url = u.trim(); }
+    if (folderId) renderFiles(); else renderFreeArticles();
+}
+
+function deleteArticle(event, id, folderId) {
+    event.stopPropagation();
+    if (!confirm('Eliminare questo articolo?')) return;
+    if (folderId) {
+        const f = getFolderById(folderId);
+        f.articles = (f.articles || []).filter(a => a.id !== id);
+        renderFiles();
+    } else {
+        window.ARCHIVE_DATA.freeArticles = (window.ARCHIVE_DATA.freeArticles || []).filter(a => a.id !== id);
+        renderFreeArticles();
+    }
+}
+
+        function createNewFolder() {
+            const name = prompt("Nome cartella:");
+            if (name) {
+                window.ARCHIVE_DATA.folders.push({ id: 'f_' + Date.now(), name: name.trim(), files: [], subfolders: [] });
+                renderFolders();
+            }
+        }
+
+        function openFolder(id, name) {
+    const resolvedName = name || getFolderById(id).name;
+    folderStack.push({ id, name: resolvedName });
+    currentFolderId = id;
+    document.getElementById('folders-view').style.display = 'none';
+    document.getElementById('free-files-view').style.display = 'none';
+    document.getElementById('free-articles-view').style.display = 'none';
+    document.getElementById('main-header').style.display = 'none';
+    document.getElementById('menu-group-home').style.display = 'none';
+    document.getElementById('menu-group-folder').style.display = 'block';
+    document.getElementById('folder-view').style.display = 'block';
+    renderFiles();
+}
+        function renderFiles() {
+            const folder = getFolderById(currentFolderId);
+
+            /// Breadcrumb a pillole
+            const breadcrumbBar = document.getElementById('breadcrumb-bar');
+            breadcrumbBar.innerHTML = '';
+            const homeEl = document.createElement('span');
+            homeEl.className = 'bc-pill bc-link';
+            homeEl.title = 'Torna all\'archivio';
+            homeEl.innerHTML = '🏠';
+            homeEl.onclick = () => {
+                folderStack = [];
+                currentFolderId = null;
+                document.getElementById('folder-view').style.display = 'none';
+                document.getElementById('folders-view').style.display = '';
+                document.getElementById('free-articles-view').style.display = '';
+                document.getElementById('main-header').style.display = 'block';
+                document.getElementById('menu-group-home').style.display = 'block';
+                document.getElementById('menu-group-folder').style.display = 'none';
+                renderFolders();
+                renderFreeFiles();
+                renderFreeArticles();
+            };
+            breadcrumbBar.appendChild(homeEl);
+
+            folderStack.forEach((item, i) => {
+                const sep = document.createElement('span');
+                sep.className = 'bc-sep';
+                sep.textContent = '›';
+                breadcrumbBar.appendChild(sep);
+
+                const pill = document.createElement('span');
+                if (i < folderStack.length - 1) {
+                    pill.className = 'bc-pill bc-link';
+                    pill.title = item.name;
+                    pill.textContent = item.name;
+                    pill.onclick = () => navigateToBreadcrumb(i);
+                } else {
+                    pill.className = 'bc-pill bc-current';
+                    pill.title = item.name;
+                    pill.textContent = item.name;
+                }
+                breadcrumbBar.appendChild(pill);
+            });
+
+            // Sottocartelle
+            const subList = document.getElementById('subfolder-list');
+subList.className = `folders-container ${window.ARCHIVE_DATA.folderViewMode || 'list'}`;
+subList.innerHTML = '';
+sortAlpha(folder.subfolders || [], 'name');
+            (folder.subfolders || []).forEach(sub => {
+                const card = document.createElement('div');
+                card.className = 'folder-card';
+                card.dataset.folderId = sub.id;
+                card.onclick = (e) => selectItem(e, card);
+                card.ondblclick = () => openFolder(sub.id, sub.name);
+                card.innerHTML = `
+                    <div class="folder-icon">📁</div>
+                    <div style="flex-grow:1;">
+                        <div class="folder-name">${sub.name}</div>
+                        <div class="folder-count">${(sub.files||[]).length} file · ${(sub.subfolders||[]).length} cartelle · ${(sub.articles||[]).length} articoli</div>
+                    </div>
+                    <div class="folder-actions">
+                        <button onclick="openFolder('${sub.id}','${sub.name.replace(/'/g,"\\'")}')">Apri</button>
+                        <button class="secondary" onclick="renameSubfolder(event,'${sub.id}')">Rinomina</button>
+                        
+                    </div>
+                `;
+                subList.appendChild(card);
+            });
+
+            const list = document.getElementById('file-list');
+list.className = `file-list ${window.ARCHIVE_DATA.folderViewMode || 'list'}`;
+list.innerHTML = folder.files.length ? '' : '<li style="text-align:center; padding:20px; color:#888;">Nessun file</li>';
+sortAlpha(folder.files, 'name');
+            folder.files.forEach(file => {
+                const li = document.createElement('li');
+                li.className = 'file-item';
+                li.dataset.fileId = file.id;
+                li.onclick = (e) => selectItem(e, li);
+                li.innerHTML = `
+    <div class="file-icon" style="font-size:28px;flex-shrink:0;">${getFileIcon(file.name)}</div>
+    <div class="file-info">
+        <div class="file-name">${file.name}</div>
+        <div class="file-size">${(file.size/1024).toFixed(1)} KB</div>
+    </div>
+    <div class="file-actions">
+        <button onclick="previewFile('${file.id}')">👁️</button>
+        <button class="secondary" onclick="renameFile(event,'${file.id}')">Rinomina</button>
+    </div>
+        
+    </div>
+`;
+                list.appendChild(li);
+            });
+            renderFolderArticles(folder);
+            refreshPasteButton();
+        }
+
+        async function handleFileUpload(event) {
+            const folder = getFolderById(currentFolderId);
+            const files = Array.from(event.target.files);
+
+            for (const file of files) {
+                try {
+                    // Usa arrayBuffer() nativo: molto più affidabile su Android
+                    // con URI content:// provenienti da "Recenti" o app di terze parti
+                    const ab = await file.arrayBuffer();
+
+                    if (!ab || ab.byteLength === 0) {
+                        alert(`Impossibile leggere "${file.name}".\nProva a selezionarlo da "Memoria Interna" invece che da "Recenti".`);
+                        continue;
+                    }
+
+                    // Costruisce il data:URL manualmente dal buffer reale
+                    const uint8 = new Uint8Array(ab);
+                    let binary = '';
+                    for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
+                    const base64 = btoa(binary);
+
+                    // Ricava il MIME type dal file (fallback generico)
+                    const mime = file.type || 'application/octet-stream';
+                    const dataUrl = `data:${mime};base64,${base64}`;
+
+                    folder.files.push({
+                        id: 'fi_' + Date.now() + Math.random(),
+                        name: file.name,
+                        size: file.size,
+                        data: dataUrl
+                    });
+                    renderFiles();
+
+                } catch (err) {
+                    alert(`Errore nella lettura di "${file.name}": ${err.message}`);
+                }
+            }
+            // Reset input per permettere ricaricamento dello stesso file
+            event.target.value = '';
+        }
+
+        function base64ToArrayBuffer(b64) {
+            const bin = window.atob(b64);
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            return bytes.buffer;
+        }
+
+async function handleFileUploadHome(event) {
+    const folders = window.ARCHIVE_DATA.folders;
+if (!folders.length) {
+    const files = Array.from(event.target.files);
+    if (!window.ARCHIVE_DATA.freeFiles) window.ARCHIVE_DATA.freeFiles = [];
+    for (const file of files) {
+        try {
+            const ab = await file.arrayBuffer();
+            if (!ab || ab.byteLength === 0) { alert(`Impossibile leggere "${file.name}".`); continue; }
+            const uint8 = new Uint8Array(ab);
+            let binary = '';
+            for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
+            const base64 = btoa(binary);
+            const mime = file.type || 'application/octet-stream';
+            window.ARCHIVE_DATA.freeFiles.push({ id: 'fi_' + Date.now() + Math.random(), name: file.name, size: file.size, data: `data:${mime};base64,${base64}` });
+        } catch (err) { alert(`Errore: ${err.message}`); }
+    }
+    renderFreeFiles();
+    renderFreeArticles();
+    event.target.value = '';
+    return;
+}
+
+    let targetFolder;
+    if (false) {
+        targetFolder = folders[0];
+    } else {
+        targetFolder = await new Promise(resolve => {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;`;
+            overlay.innerHTML = `
+                <div style="background:white;border-radius:16px;padding:24px;width:300px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 30px rgba(0,0,0,0.25);">
+                    <div style="font-size:18px;font-weight:600;margin-bottom:6px;text-align:center;">📂 Dove aggiungere?</div>
+                    <div style="font-size:13px;color:#86868b;margin-bottom:16px;text-align:center;">Scegli una cartella o lascia libero</div>
+                    <div id="folder-pick-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+                    <button id="btn-free-pick" style="margin-top:4px;width:100%;padding:12px;background:#f2f2f7;color:#333;border:none;border-radius:10px;font-size:14px;cursor:pointer;text-align:left;">📄 File libero (schermata iniziale)</button>
+                    <button id="btn-annulla-pick" style="margin-top:16px;width:100%;padding:10px;background:#e8e8ed;color:#333;border:none;border-radius:10px;font-size:14px;cursor:pointer;">Annulla</button>
+                </div>`;
+            document.body.appendChild(overlay);
+
+            const list = overlay.querySelector('#folder-pick-list');
+            folders.forEach(f => {
+                const btn = document.createElement('button');
+                btn.style.cssText = `width:100%;padding:12px;background:var(--accent);color:white;border:none;border-radius:10px;font-size:14px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px;`;
+                btn.innerHTML = `<span>📂</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.name}</span><span style="font-size:11px;opacity:0.8;">${f.files.length} file</span>`;
+                btn.onclick = () => { overlay.remove(); resolve(f); };
+                list.appendChild(btn);
+            });
+
+            overlay.querySelector('#btn-annulla-pick').onclick = () => { overlay.remove(); resolve(null); };
+            overlay.querySelector('#btn-free-pick').onclick = () => { overlay.remove(); resolve('__free__'); };
+        });
+    }
+
+    if (!targetFolder) { event.target.value = ''; return; }
+if (targetFolder === '__free__') {
+    const files = Array.from(event.target.files);
+    if (!window.ARCHIVE_DATA.freeFiles) window.ARCHIVE_DATA.freeFiles = [];
+    for (const file of files) {
+        try {
+            const ab = await file.arrayBuffer();
+            if (!ab || ab.byteLength === 0) { alert(`Impossibile leggere "${file.name}".`); continue; }
+            const uint8 = new Uint8Array(ab);
+            let binary = '';
+            for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
+            const base64 = btoa(binary);
+            const mime = file.type || 'application/octet-stream';
+            window.ARCHIVE_DATA.freeFiles.push({ id: 'fi_' + Date.now() + Math.random(), name: file.name, size: file.size, data: `data:${mime};base64,${base64}` });
+        } catch (err) { alert(`Errore: ${err.message}`); }
+    }
+    renderFreeFiles();
+    renderFreeArticles();
+    event.target.value = '';
+    return;
+}
+
+    const files = Array.from(event.target.files);
+    for (const file of files) {
+        try {
+            const ab = await file.arrayBuffer();
+            if (!ab || ab.byteLength === 0) {
+                alert(`Impossibile leggere "${file.name}".`);
+                continue;
+            }
+            const uint8 = new Uint8Array(ab);
+            let binary = '';
+            for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
+            const base64 = btoa(binary);
+            const mime = file.type || 'application/octet-stream';
+            targetFolder.files.push({
+                id: 'fi_' + Date.now() + Math.random(),
+                name: file.name,
+                size: file.size,
+                data: `data:${mime};base64,${base64}`
+            });
+        } catch (err) {
+            alert(`Errore nella lettura di "${file.name}": ${err.message}`);
+        }
+    }
+    renderFolders();
+    renderFreeFiles();
+    renderFreeArticles();
+    event.target.value = '';
+}
+
+        function base64ToBlob(base64, mime) {
+            const byteCharacters = atob(base64.split(',')[1]);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            return new Blob([byteArray], {type: mime});
+        }
+
+        // --- ANTEPRIMA MODALE INLINE (funziona offline su Android/tablet) ---
+
+        let _previewFileData = null; // usato da downloadCurrentPreview
+
+        function closePreview() {
+            const modal = document.getElementById('preview-modal');
+            modal.classList.remove('open');
+            // Ferma audio/video se in riproduzione
+            const media = modal.querySelectorAll('audio, video');
+            media.forEach(m => { m.pause(); m.src = ''; });
+            document.getElementById('preview-body').innerHTML = '';
+            _previewFileData = null;
+        }
+
+        function downloadCurrentPreview() {
+            if (!_previewFileData) return;
+            const a = document.createElement('a');
+            a.href = _previewFileData.data;
+            a.download = _previewFileData.name;
+            a.click();
+        }
+
+        function openPreviewModal(fileName, contentEl) {
+            document.getElementById('preview-title').textContent = fileName;
+            const body = document.getElementById('preview-body');
+            body.innerHTML = '';
+            body.appendChild(contentEl);
+            document.getElementById('preview-modal').classList.add('open');
+        }
+
+        async function previewFile(id, isFreeFile) {
+    let file;
+    if (isFreeFile) {
+        file = (window.ARCHIVE_DATA.freeFiles || []).find(f => f.id === id);
+    } else {
+        const folder = getFolderById(currentFolderId);
+        file = folder.files.find(f => f.id === id);
+    }
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    _previewFileData = file;
+
+                       // --- PDF ---
+            if (ext === 'pdf') {
+                const container = document.createElement('div');
+                container.style.cssText = 'width:100%;display:flex;flex-direction:column;align-items:center;gap:10px;';
+                container.innerHTML = '<p style="color:#888;font-size:13px;">Caricamento PDF...</p>';
+                openPreviewModal(file.name, container);
+
+                try {
+                    await loadLibrary('lib-pdfjs', 'pdfjsLib', 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+                    
+                    if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+                        const workerEl = document.getElementById('lib-pdfjs-worker');
+                        const workerCode = workerEl ? workerEl.textContent.trim() : '';
+                        if (workerCode) {
+                            const blob = new Blob([workerCode], { type: 'text/javascript' });
+                            window.pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
+                        } else {
+                            window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                        }
+                    }
+
+                    const pdfjs = window.pdfjsLib;
+                    const ab = base64ToArrayBuffer(file.data.split(',')[1]);
+                    const pdf = await pdfjs.getDocument({data: ab}).promise;
+                    container.innerHTML = '';
+                    
+                    const dpr = window.devicePixelRatio || 1;
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const cssWidth = Math.min(window.innerWidth - 32, 900);
+                        const baseScale = cssWidth / page.getViewport({scale: 1}).width;
+                        // Moltiplica per DPR: il canvas ha risoluzione fisica reale
+                        const viewport = page.getViewport({scale: baseScale * dpr});
+                        const canvas = document.createElement('canvas');
+                        canvas.width = viewport.width;
+                        canvas.height = viewport.height;
+                        // Ridimensiona via CSS alla dimensione visiva CSS (non fisica)
+                        canvas.style.cssText = `width:100%;max-width:900px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.15);`;
+                        await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+                        container.appendChild(canvas);
+                    }
+                } catch(e) {
+                    container.innerHTML = '<p style="color:#d9534f;text-align:center;margin-top:40px;">Errore PDF.<br><small>' + e.message + '</small></p>';
+                }
+                return;
+            }
+
+          // --- DOCX ---
+if (ext === 'docx') {
+    try {
+        await loadLibrary('lib-mammoth', 'mammoth', 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
+        const mime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        const blob = base64ToBlob(file.data, mime);
+        const ab = await blob.arrayBuffer();
+        const result = await mammoth.convertToHtml({arrayBuffer: ab});
+        const div = document.createElement('div');
+        div.className = 'preview-rich';
+        div.innerHTML = result.value;
+        openPreviewModal(file.name, div);
+    } catch(e) {
+        const div = document.createElement('div');
+        div.className = 'preview-msg';
+        div.textContent = 'Errore nella lettura del file Word: ' + e.message;
+        openPreviewModal(file.name, div);
+    }
+    return;
+}
+            // --- Excel / CSV ---
+            if (['xls','xlsx','csv'].includes(ext)) {
+                try {
+                    await loadLibrary('lib-xlsx', 'XLSX', 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+                    const ab = base64ToArrayBuffer(file.data.split(',')[1]);
+                    const wb = XLSX.read(ab, {type:'array'});
+                    const htmlstr = XLSX.utils.sheet_to_html(wb.Sheets[wb.SheetNames[0]]);
+                    const div = document.createElement('div');
+                    div.className = 'preview-table';
+                    div.innerHTML = htmlstr;
+                    openPreviewModal(file.name, div);
+                } catch(e) {
+                    const div = document.createElement('div'); div.className = 'preview-msg'; div.textContent = 'Errore caricamento Excel.'; openPreviewModal(file.name, div);
+                }
+                return;
+            }
+
+            // --- Markdown ---
+            if (ext === 'md') {
+                try {
+                    await loadLibrary('lib-marked', 'marked', 'https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js');
+                    const text = decodeURIComponent(escape(atob(file.data.split(',')[1])));
+                    const div = document.createElement('div');
+                    div.className = 'preview-rich';
+                    div.innerHTML = marked.parse(text);
+                    openPreviewModal(file.name, div);
+                } catch(e) {
+                    const div = document.createElement('div'); div.className = 'preview-msg'; div.textContent = 'Errore caricamento Markdown.'; openPreviewModal(file.name, div);
+                }
+                return;
+            }
+            
+
+            // --- Immagini ---
+            const imgExts = ['jpg','jpeg','png','gif','webp','bmp','svg'];
+            if (imgExts.includes(ext)) {
+                const img = document.createElement('img');
+                img.src = file.data;
+                openPreviewModal(file.name, img);
+                return;
+            }
+
+            // --- Audio ---
+            const audioExts = ['mp3','wav','ogg','m4a','aac'];
+            if (audioExts.includes(ext)) {
+                const mimeMap = { mp3:'audio/mpeg', wav:'audio/wav', ogg:'audio/ogg', m4a:'audio/mp4', aac:'audio/aac' };
+                const blob = base64ToBlob(file.data, mimeMap[ext] || 'audio/mpeg');
+                const audio = document.createElement('audio');
+                audio.controls = true;
+                audio.src = URL.createObjectURL(blob);
+                openPreviewModal(file.name, audio);
+                return;
+            }
+
+            // --- Video ---
+            const videoExts = ['mp4','webm','ogv'];
+            if (videoExts.includes(ext)) {
+                const mimeMap = { mp4:'video/mp4', webm:'video/webm', ogv:'video/ogg' };
+                const blob = base64ToBlob(file.data, mimeMap[ext] || 'video/mp4');
+                const video = document.createElement('video');
+                video.controls = true;
+                video.src = URL.createObjectURL(blob);
+                openPreviewModal(file.name, video);
+                return;
+            }
+
+            // --- HTML ---
+            if (ext === 'html') {
+                const blob = base64ToBlob(file.data, 'text/html');
+                const iframe = document.createElement('iframe');
+                iframe.src = URL.createObjectURL(blob);
+                openPreviewModal(file.name, iframe);
+                return;
+            }
+
+
+            // --- Testo / Codice ---
+            if (['txt','css','js','json','xml'].includes(ext)) {
+                try {
+                    const text = decodeURIComponent(escape(atob(file.data.split(',')[1])));
+                    const div = document.createElement('div');
+                    div.className = 'preview-text';
+                    div.textContent = text;
+                    openPreviewModal(file.name, div);
+                } catch(e) {
+                    const div = document.createElement('div');
+                    div.className = 'preview-msg';
+                    div.textContent = 'Impossibile leggere il file come testo.';
+                    openPreviewModal(file.name, div);
+                }
+                return;
+            }
+
+// --- ZIP ---
+if (ext === 'zip') {
+    const container = document.createElement('div');
+    container.className = 'zip-preview';
+    container.innerHTML = '<p class="zip-header">Caricamento archivio...</p>';
+    openPreviewModal(file.name, container);
+    try {
+        await loadLibrary('lib-jszip', 'JSZip', 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+        const ab = base64ToArrayBuffer(file.data.split(',')[1]);
+        const zip = await JSZip.loadAsync(ab);
+        const entries = [];
+        zip.forEach((relativePath, zipEntry) => { if (!zipEntry.dir) entries.push({ path: relativePath, entry: zipEntry }); });
+        entries.sort((a, b) => a.path.localeCompare(b.path));
+        const extIconMap = { pdf:'📄',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',csv:'📊',txt:'📃',md:'📃',jpg:'🖼️',jpeg:'🖼️',png:'🖼️',gif:'🖼️',webp:'🖼️',mp3:'🎵',wav:'🎵',mp4:'🎬',html:'🌐',json:'🗂️',xml:'🗂️',zip:'📦' };
+        const iconFor = name => extIconMap[name.split('.').pop().toLowerCase()] || '📎';
+        const fmtSize = b => b < 1024 ? b+' B' : b < 1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(2)+' MB';
+        container.innerHTML = `<div class="zip-header">${entries.length} file nell'archivio</div>`;
+        for (const { path, entry } of entries) {
+            const shortName = path.split('/').pop();
+            const uncompressedSize = (entry._data || {}).uncompressedSize || 0;
+            const row = document.createElement('div');
+            row.className = 'zip-file-row';
+            row.innerHTML = `
+                <span class="zip-file-icon">${iconFor(shortName)}</span>
+                <div class="zip-file-info">
+                    <div class="zip-file-name" title="${path}">${path}</div>
+                    <div class="zip-file-size">${uncompressedSize ? fmtSize(uncompressedSize) : ''}</div>
+                </div>
+                <button class="zip-dl-btn">⬇️ Scarica</button>
+            `;
+            row.querySelector('.zip-dl-btn').addEventListener('click', async () => {
+                const btn = row.querySelector('.zip-dl-btn');
+                btn.textContent = '⏳'; btn.disabled = true;
+                try {
+                    const blob = await entry.async('blob');
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a'); a.href = url; a.download = shortName; a.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 5000);
+                } catch(e) { alert('Errore: ' + e.message); }
+                btn.textContent = '⬇️ Scarica'; btn.disabled = false;
+            });
+            container.appendChild(row);
+        }
+        if (!entries.length) container.innerHTML = '<p class="zip-header" style="text-align:center;">Archivio vuoto.</p>';
+    } catch(e) {
+        container.innerHTML = `<p style="text-align:center;color:#d9534f;margin-top:40px;">Errore lettura ZIP:<br><small>${e.message}</small></p>`;
+    }
+    return;
+}
+
+// --- JWPUB ---
+if (ext === 'jwpub') {
+    const base64 = file.data;
+    const name = file.name;
+    try {
+        await loadLibrary('lib-jszip', 'JSZip', 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+        const byteChars = atob(base64.split(',')[1]);
+        const arr = new Uint8Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) arr[i] = byteChars.charCodeAt(i);
+        const zip = await JSZip.loadAsync(arr.buffer);
+        const manifestFile = zip.file('manifest.json');
+        if (!manifestFile) throw new Error('no manifest');
+        const manifestText = await manifestFile.async('string');
+        const manifest = JSON.parse(manifestText);
+        const pub = manifest.publication && manifest.publication.symbol;
+        const langMatch = manifest.name && manifest.name.match(/_([A-Z]+)\.jwpub$/i);
+        const lang = langMatch ? langMatch[1].toUpperCase() : 'I';
+        if (!pub || !lang) throw new Error('dati mancanti');
+
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        const isAndroidChrome = !isIOS && /Android/.test(navigator.userAgent) && /Chrome/.test(navigator.userAgent) && !/Edg|OPR|SamsungBrowser|MiuiBrowser/.test(navigator.userAgent);
+
+        const dlOverlay = document.createElement('div');
+        dlOverlay.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1c1c1e;color:white;padding:16px 20px;border-radius:14px;z-index:99999;display:flex;flex-direction:column;gap:10px;box-shadow:0 4px 20px rgba(0,0,0,0.4);font-family:sans-serif;font-size:13px;min-width:220px;';
+        dlOverlay.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span>📖 <b>${name}</b></span>
+                <button id="btn-jwpub-close" style="background:transparent;color:#aaa;border:none;font-size:18px;cursor:pointer;line-height:1;margin-left:12px;">✕</button>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button id="btn-jwpub-app" style="flex:1;background:#1565C0;color:white;border:none;border-radius:8px;padding:8px 10px;font-size:13px;cursor:pointer;">📲 Apri in app</button>
+                <button id="btn-jwpub-dl" style="flex:1;background:#e8f5e9;color:#2e7d32;border:1px solid #2e7d32;border-radius:8px;padding:8px 10px;font-size:13px;cursor:pointer;">⬇ Scarica</button>
+            </div>`;
+        document.body.appendChild(dlOverlay);
+        dlOverlay.querySelector('#btn-jwpub-close').onclick = () => dlOverlay.remove();
+
+        const scarica = () => {
+            const b = atob(base64.split(',')[1]);
+            const arr2 = new Uint8Array(b.length);
+            for (let i = 0; i < b.length; i++) arr2[i] = b.charCodeAt(i);
+            const blobFile = new Blob([arr2], {type:'application/octet-stream'});
+            const url = URL.createObjectURL(blobFile);
+            const a = document.createElement('a');
+            a.href = url; a.download = name; a.click();
+            URL.revokeObjectURL(url);
+            dlOverlay.remove();
+        };
+
+        dlOverlay.querySelector('#btn-jwpub-app').onclick = () => {
+            if (isIOS) {
+                const schemeLink = document.createElement('a');
+                schemeLink.href = `jwlibrary:///catalog?pub=${pub}&wtlocale=${lang}`;
+                schemeLink.style.display = 'none';
+                document.body.appendChild(schemeLink);
+                schemeLink.click();
+                document.body.removeChild(schemeLink);
+                dlOverlay.remove();
+            } else if (isAndroidChrome) {
+                const jwUrl = `jwlibrary:///catalog?pub=${pub}&wtlocale=${lang}`;
+                const html = `<!DOCTYPE html><html><head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width,initial-scale=1">
+                    <title>Apertura JW Library...</title>
+                    <style>
+                        body{font-family:sans-serif;background:#f0f2f5;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;}
+                        .card{background:white;border-radius:14px;padding:30px 24px;max-width:340px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.1);}
+                        h2{color:#1565C0;margin-bottom:8px;font-size:16pt;}
+                        p{color:#555;font-size:10pt;margin-bottom:20px;}
+                        .msg{display:none;color:#e53935;font-size:10pt;margin-top:16px;padding:12px;background:#fdecea;border-radius:8px;}
+                    </style>
+                    </head><body>
+                    <div class="card">
+                        <div style="font-size:48px">📖</div>
+                        <h2>Apertura JW Library</h2>
+                        <p>Tentativo di apertura del file in JW Library...</p>
+                        <div class="msg" id="msg">
+                            ⚠️ Il file <b>${name}</b> non è installato in JW Library.<br><br>
+                            Scaricalo prima dall'OdG e poi importalo in JW Library.
+                        </div>
+                    </div>
+                    <script>
+                        window.location.href = '${jwUrl}';
+                        setTimeout(() => {
+                            document.getElementById('msg').style.display = 'block';
+                        }, 800);
+                    <\/script>
+                    </body></html>`;
+                const blob = new Blob([html], {type:'text/html'});
+                const blobUrl = URL.createObjectURL(blob);
+                window.open(blobUrl, '_blank');
+                dlOverlay.remove();
+            } else {
+                scarica();
+            }
+        };
+
+        dlOverlay.querySelector('#btn-jwpub-dl').onclick = scarica;
+        setTimeout(() => { if (dlOverlay.parentNode) dlOverlay.remove(); }, 30000);
+    } catch(e) {
+        // manifest non leggibile, niente azione
+    }
+    return;
+}
+
+            // --- .doc e formati non supportati ---
+            const div = document.createElement('div');
+            div.className = 'preview-msg';
+            if (ext === 'doc') {
+                div.innerHTML = 'I vecchi file <b>.doc</b> non possono essere aperti nel browser.<br>Convertili in <b>.docx</b>.';
+            } else {
+                div.innerHTML = 'Anteprima non disponibile per il formato <b>.' + ext + '</b>';
+            }
+            const dl = document.createElement('a');
+            dl.href = file.data;
+            dl.download = file.name;
+            dl.textContent = 'Scarica File';
+            div.appendChild(dl);
+            openPreviewModal(file.name, div);
+        }
+
+        function downloadSelectedFiles() {
+            const selected = document.querySelectorAll('.file-item.selected');
+            if (!selected.length) { alert("Seleziona almeno un file."); return; }
+            const folder = getFolderById(currentFolderId);
+            selected.forEach(li => {
+                const id = li.dataset.fileId;
+                const file = folder.files.find(f => f.id === id);
+                if (!file) return;
+                const a = document.createElement('a'); a.href = file.data; a.download = file.name; a.click();
+            });
+        }
+
+        function deleteSelectedFiles() {
+            const selected = document.querySelectorAll('.file-item.selected');
+            if (!selected.length) { alert("Seleziona almeno un file."); return; }
+            if (!confirm(`Eliminare ${selected.length} file selezionati?`)) return;
+            const folder = getFolderById(currentFolderId);
+            const ids = Array.from(selected).map(li => li.dataset.fileId);
+            folder.files = folder.files.filter(f => !ids.includes(f.id));
+            renderFiles();
+        }
+
+        function downloadFile(id) {
+            const folder = getFolderById(currentFolderId);
+            const file = folder.files.find(f => f.id === id);
+            const a = document.createElement('a'); a.href = file.data; a.download = file.name; a.click();
+        }
+
+        function deleteFile(id) {
+    const folder = getFolderById(currentFolderId);
+    const file = folder.files.find(f => f.id === id);
+    if (!file) return;
+    if (!confirm(`Eliminare il file "${file.name}"?`)) return;
+    folder.files = folder.files.filter(f => f.id !== id);
+    renderFiles();
+}
+
+        function deleteFolder(event, id) {
+            event.stopPropagation();
+            if (confirm("Eliminare cartella?")) {
+                window.ARCHIVE_DATA.folders = window.ARCHIVE_DATA.folders.filter(f => f.id !== id);
+                renderFolders();
+            }
+        }
+
+        function renameFolder(event, id) {
+            event.stopPropagation();
+            const folder = window.ARCHIVE_DATA.folders.find(f => f.id === id);
+            const n = prompt("Nuovo nome:", folder.name);
+            if (n) { folder.name = n.trim(); renderFolders(); }
+        }
+
+        function emptyArchive() {
+            if (confirm("Svuotare tutti i file incluse le sottocartelle?")) {
+                function svuotaRicorsivo(folder) {
+                    folder.files = [];
+                    (folder.subfolders || []).forEach(svuotaRicorsivo);
+                }
+                window.ARCHIVE_DATA.folders.forEach(svuotaRicorsivo);
+                renderFolders();
+            }
+        }
+
+        async function downloadFolder(event, id) {
+    event.stopPropagation();
+    // Cerca prima nelle cartelle radice, poi ovunque con getFolderById
+    const folder = window.ARCHIVE_DATA.folders.find(f => f.id === id) || getFolderById(id);
+    try {
+        await loadLibrary('lib-jszip', 'JSZip', 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+        const zip = new JSZip();
+
+        // Funzione ricorsiva che aggiunge file e sottocartelle
+        function addFolderToZip(zipFolder, folderData) {
+            folderData.files.forEach(f => {
+                zipFolder.file(f.name, f.data.split(',')[1], {base64: true});
+            });
+            (folderData.subfolders || []).forEach(sub => {
+                const subZip = zipFolder.folder(sub.name);
+                addFolderToZip(subZip, sub);
+            });
+        }
+
+        addFolderToZip(zip, folder);
+        const content = await zip.generateAsync({type:"blob"});
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(content);
+        a.download = `${folder.name}.zip`;
+        a.click();
+    } catch(e) {
+        alert("Errore creazione ZIP: " + e.message);
+    }
+}
+                async function saveArchive() {
+                const prendiCodice = id => { const el = document.getElementById(id); return el ? el.textContent : ''; };
+                
+                const getScriptText = id => { const el = document.getElementById(id); return el ? el.textContent : ''; };
+                
+            const btn = document.getElementById('btn-save');
+            const originalText = btn.textContent;
+            btn.textContent = "Salvataggio...";
+            btn.disabled = true;
+let pwdScelta = null; // Questa riga DEVE stare qui fuori
+const op = '<script';
+const ct = '</' + 'script>';
+
+            try {
+            
+            
+                // 1. Chiedi se l'utente vuole proteggere il clone
+                const vuolePassword = await new Promise(resolve => {
+                    const overlay = document.createElement('div');
+                    overlay.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;`;
+                    overlay.innerHTML = `
+                        <div style="background:white;border-radius:16px;padding:28px 24px;width:300px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,0.25);">
+                            <div style="font-size:32px;margin-bottom:10px;">🔐</div>
+                            <div style="font-size:16px;font-weight:600;margin-bottom:6px;">Protezione Archivio</div>
+                            <div style="font-size:13px;color:#86868b;margin-bottom:20px;">Vuoi proteggere questo clone con una password?</div>
+                            <div style="display:flex;gap:10px;justify-content:center;">
+                                <button id="btn-si-pwd" style="flex:1;padding:10px;background:var(--accent);color:white;border:none;border-radius:10px;font-size:14px;cursor:pointer;font-weight:600;">✅ Sì</button>
+                                <button id="btn-no-pwd" style="flex:1;padding:10px;background:var(--secondary-btn);color:#333;border:none;border-radius:10px;font-size:14px;cursor:pointer;">❌ No</button>
+                            </div>
+                        </div>`;
+                    document.body.appendChild(overlay);
+                    overlay.querySelector('#btn-si-pwd').onclick = () => { overlay.remove(); resolve(true); };
+                    overlay.querySelector('#btn-no-pwd').onclick = () => { overlay.remove(); resolve(false); };
+                });
+
+                                let hashPassword = null;
+                if (vuolePassword) {
+                    hashPassword = await new Promise(resolve => {
+                        const overlay = document.createElement('div');
+                        overlay.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;`;
+                        overlay.innerHTML = `
+                            <div style="background:white;border-radius:16px;padding:28px 24px;width:300px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,0.25);">
+                                <div style="font-size:32px;margin-bottom:10px;">🔑</div>
+                                <div style="font-size:16px;font-weight:600;margin-bottom:16px;">Imposta Password</div>
+                                
+                                <div style="position:relative;margin-bottom:10px;">
+                                    <input id="pwd-input" type="password" placeholder="Inserisci password..." style="width:100%;padding:12px;padding-right:40px;border:1px solid #d1d1d6;border-radius:10px;font-size:16px;box-sizing:border-box;text-align:center;outline:none;">
+                                    <span id="toggle-pwd1" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px;">👁</span>
+                                </div>
+                                
+                                <div style="position:relative;margin-bottom:6px;">
+                                    <input id="pwd-confirm" type="password" placeholder="Conferma password..." style="width:100%;padding:12px;padding-right:40px;border:1px solid #d1d1d6;border-radius:10px;font-size:16px;box-sizing:border-box;text-align:center;outline:none;">
+                                    <span id="toggle-pwd2" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px;">👁</span>
+                                </div>
+
+                                <div id="pwd-err" style="color:var(--danger);font-size:12px;min-height:16px;margin-bottom:10px;"></div>
+                                <button id="btn-conferma-pwd" style="padding:12px;background:var(--accent);color:white;border:none;border-radius:10px;font-size:14px;cursor:pointer;font-weight:600;width:100%;">Conferma</button>
+                                <button id="btn-annulla-pwd" style="margin-top:10px;padding:12px;background:transparent;color:#888;border:none;font-size:14px;cursor:pointer;width:100%;">Annulla</button>
+                            </div>`;
+                        document.body.appendChild(overlay);
+
+                        // Gestione visibilità campi password
+                        overlay.querySelector('#toggle-pwd1').onclick = () => {
+                            const i = overlay.querySelector('#pwd-input');
+                            i.type = i.type === 'password' ? 'text' : 'password';
+                        };
+                        overlay.querySelector('#toggle-pwd2').onclick = () => {
+                            const i = overlay.querySelector('#pwd-confirm');
+                            i.type = i.type === 'password' ? 'text' : 'password';
+                        };
+
+                        overlay.querySelector('#btn-conferma-pwd').onclick = () => {
+                            const p1 = overlay.querySelector('#pwd-input').value;
+                            const p2 = overlay.querySelector('#pwd-confirm').value;
+                            if (!p1) { overlay.querySelector('#pwd-err').textContent = 'La password non può essere vuota.'; return; }
+                            if (p1 !== p2) { overlay.querySelector('#pwd-err').textContent = 'Le password non coincidono.'; return; }
+                            overlay.remove();
+                            resolve(p1);
+                        };
+
+                        overlay.querySelector('#btn-annulla-pwd').onclick = () => {
+                            overlay.remove();
+                            resolve(null);
+                        };
+                    });
+
+                    // Se l'utente preme Annulla, fermiamo la generazione del clone
+                    if (!hashPassword) {
+                        btn.textContent = originalText;
+                        btn.disabled = false;
+                        return;
+                    }
+                }
+
+
+                async function fetchLib(url) {
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error('Fetch fallito: ' + url);
+                    return await res.text();
+                }
+
+                // Recupera librerie
+                const jszip     = getScriptText('lib-jszip')     || await fetchLib('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+                const mammoth   = getScriptText('lib-mammoth')   || await fetchLib('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
+                const xlsx      = getScriptText('lib-xlsx')      || await fetchLib('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+                const marked    = getScriptText('lib-marked')    || await fetchLib('https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js');
+                const pdfjs     = getScriptText('lib-pdfjs')     || await fetchLib('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+                const pdfWorker = getScriptText('lib-pdfjs-worker') || await fetchLib('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js');
+                
+
+                function escapeScript(code) { return code.replace(/<\/script>/gi, ct); }
+
+                const appScript = getScriptText('app-script');
+                const dataString = JSON.stringify(window.ARCHIVE_DATA);
+                
+                
+                // 2. Prepara il Payload (Criptato o in chiaro)
+                let payloadCriptato = '';
+                
+              // Se c'è una password, i dati in chiaro diventano 'null' (illeggibili)
+let stringaArchivioInChiaro = pwdScelta ? 'null' : JSON.stringify(window.ARCHIVE_DATA);
+
+
+                if (vuolePassword && hashPassword) {
+                    payloadCriptato = await ArchiveCrypto.encryptData(dataString, hashPassword);
+                } else {
+                    stringaArchivioInChiaro = dataString;
+                }
+                // Se c'è una password, i dati in chiaro diventano 'null'
+let dataInChiaro = pwdScelta ? 'null' : dataString; 
+
+
+                // 3. Costruzione dell'HTML
+                const clone = [
+                    '<!DOCTYPE html>',
+                    '<html lang="it">',
+                    '<head>',
+                    '<meta charset="UTF-8">',
+                    '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+                    '<title>Archivio Digitale<' + '/title>',
+                    op + ' id="lib-jszip" type="text/plain">\n' + escapeScript(jszip) + '\n' + ct,
+                    op + ' id="lib-mammoth" type="text/plain">\n' + escapeScript(mammoth) + '\n' + ct,
+                    op + ' id="lib-xlsx" type="text/plain">\n' + escapeScript(xlsx) + '\n' + ct,
+                    op + ' id="lib-marked" type="text/plain">\n' + escapeScript(marked) + '\n' + ct,
+                    op + ' id="lib-pdfjs" type="text/plain">\n' + escapeScript(pdfjs) + '\n' + ct,
+                    op + ' id="lib-pdfjs-worker" type="text/plain">\n' + escapeScript(pdfWorker) + '\n' + ct,
+                    document.querySelector('style').outerHTML,
+                    '<' + '/head>',
+                    '<body onclick="deselectAll(event)">',
+                    
+                    document.getElementById('folder-view-header').outerHTML,
+                    
+                    (function(){ const h = document.getElementById('main-header').cloneNode(true); const b = h.querySelector('#btn-save'); if(b){b.removeAttribute('disabled');b.textContent='💾 Salva';} h.style.display='block'; return h.outerHTML; })(),
+                    '<div id="folders-view" class="folders-container grid"><' + '/div>',
+'<ul id="free-files-view" style="display:none;"><' + '/ul>',
+'<div id="free-articles-view"><' + '/div>',
+document.getElementById('multi-action-bar').outerHTML,
+                    document.getElementById('fab-main').outerHTML,
+                    document.getElementById('header-menu').outerHTML,
+                    document.getElementById('menu-overlay').outerHTML,
+                    (function(){ const fv = document.getElementById('folder-view').cloneNode(true); fv.style.display='none'; return fv.outerHTML; })(),
+                    document.getElementById('preview-modal').outerHTML,
+                    // QUI INSERIAMO IL PAYLOAD E I DATI
+                    op + ' id="archive-crypto-payload" type="application/json">\n' + payloadCriptato + '\n' + ct,
+                    op + ' id="archive-data-script">\n window.ARCHIVE_DATA = ' + stringaArchivioInChiaro + ';\n' + ct,
+                   
+                    op + ' id="app-script">\n' + appScript + '\n' + ct,
+                    '<' + '/body>',
+                    '<' + '/html>'
+                ].join('\n');
+
+                const blob = new Blob([clone], {type: 'text/html'});
+
+const isXiaomi = /xiaomi|miui/i.test(navigator.userAgent);
+if ('showSaveFilePicker' in window && !isXiaomi) {
+    try {
+        if (!fileHandleSalvataggio) {
+            fileHandleSalvataggio = await window.showSaveFilePicker({
+                suggestedName: 'Archivio_' + (pwdScelta ? 'Protetto_' : '') + new Date().toLocaleDateString().replace(/\//g, '-') + '.html',
+                types: [{ description: 'Pagina HTML', accept: { 'text/html': ['.html'] } }]
+            });
+        }
+        const writable = await fileHandleSalvataggio.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        showToast('✅ Archivio salvato');
+    } catch (err) {
+        if (err.name !== 'AbortError') {
+            alert('Errore durante il salvataggio: ' + err.message);
+        }
+        fileHandleSalvataggio = null;
+    }
+} else {
+    const nomeFile = 'Archivio_' + (pwdScelta ? 'Protetto_' : '') + new Date().toLocaleDateString().replace(/\//g, '-') + '.html';
+    const url = URL.createObjectURL(blob);
+    btn.textContent = originalText;
+    btn.disabled = false;
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99999;display:flex;align-items:center;justify-content:center;`;
+    overlay.innerHTML = `
+        <div style="background:white;border-radius:14px;padding:28px 24px;width:300px;text-align:center;font-family:'Segoe UI',sans-serif;">
+            <div style="font-size:32px;margin-bottom:10px;">💾</div>
+            <div style="font-size:12pt;font-weight:bold;margin-bottom:8px;">Salva il file</div>
+            <div style="font-size:9pt;color:#666;margin-bottom:20px;">Tocca il pulsante qui sotto per scaricare il file sul dispositivo.</div>
+            <a id="btn-dl-archivio" href="${url}" download="${nomeFile}"
+               style="display:block;background:#1565C0;color:white;padding:12px;border-radius:8px;text-decoration:none;font-weight:bold;margin-bottom:10px;">
+                📥 Scarica File
+            </a>
+            <button id="btn-ann-archivio" style="background:transparent;border:none;color:#999;cursor:pointer;font-size:9pt;width:100%;">Annulla</button>
+        </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#btn-ann-archivio').onclick = () => { overlay.remove(); URL.revokeObjectURL(url); };
+    overlay.querySelector('#btn-dl-archivio').onclick = () => { setTimeout(() => { overlay.remove(); URL.revokeObjectURL(url); }, 1000); };
+}
+
+
+            } catch(e) {
+                alert('Errore nel salvataggio: ' + e.message);
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        }
+        
+        function salvaComeArchivio() {
+    fileHandleSalvataggio = null;
+    saveArchive();
+}
+
+// ── Menu hamburger principale ──
+function toggleMenu(e) {
+    e.stopPropagation();
+    const menu = document.getElementById('header-menu');
+    const overlay = document.getElementById('menu-overlay');
+    const isOpen = menu.classList.contains('open');
+    menu.classList.toggle('open', !isOpen);
+    overlay.classList.toggle('open', !isOpen);
+}
+function closeMenu() {
+    document.getElementById('header-menu').classList.remove('open');
+    document.getElementById('menu-overlay').classList.remove('open');
+}
+
+// ── Menu hamburger cartella ──
+function toggleFolderMenu(e) {
+    e.stopPropagation();
+    const menu = document.getElementById('folder-header-menu');
+    const overlay = document.getElementById('folder-menu-overlay');
+    const isOpen = menu.classList.contains('open');
+    menu.classList.toggle('open', !isOpen);
+    overlay.classList.toggle('open', !isOpen);
+}
+function closeFolderMenu() {
+    document.getElementById('folder-header-menu').classList.remove('open');
+    document.getElementById('folder-menu-overlay').classList.remove('open');
+}
+
+// ── Folder sticky header visibility ──
+function showFolderStickyHeader(folderName) {
+    const fvh = document.getElementById('folder-view-header');
+    const mainH = document.getElementById('main-header');
+    document.getElementById('folder-title-label').textContent = folderName || 'Cartella';
+    fvh.classList.add('active');
+    mainH.style.display = 'none';
+    document.body.style.paddingTop = 'calc(var(--header-height) + 8px)';
+}
+function hideFolderStickyHeader() {
+    const fvh = document.getElementById('folder-view-header');
+    const mainH = document.getElementById('main-header');
+    fvh.classList.remove('active');
+    mainH.style.display = '';
+    document.body.style.paddingTop = '';
+    closeFolderMenu();
+}
+
+// ── Back button ──
+function goBackFromFolder() {
+    hideFolderStickyHeader();
+    if (typeof folderHistory !== 'undefined' && folderHistory.length > 1) {
+        folderHistory.pop();
+        const prev = folderHistory[folderHistory.length - 1];
+        if (prev === null) { closeFolder(); } else { openFolder(prev, false); }
+    } else {
+        closeFolder();
+    }
+}
+
+// ── MutationObserver: watch folder-view display changes ──
+window.addEventListener('DOMContentLoaded', () => {
+    const fv = document.getElementById('folder-view');
+    if (!fv) return;
+    const obs = new MutationObserver(() => {
+        const isVisible = fv.style.display && fv.style.display !== 'none';
+        if (isVisible) {
+            setTimeout(() => {
+                const current = document.querySelector('#breadcrumb-bar .bc-pill.bc-current');
+                const name = current ? current.textContent.trim() : 'Cartella';
+                showFolderStickyHeader(name);
+            }, 60);
+        } else {
+            hideFolderStickyHeader();
+        }
+    });
+    obs.observe(fv, { attributes: true, attributeFilter: ['style'] });
+});
+
+// ── Esporta Backup ──
+function exportBackup() {
+    try {
+        const data = JSON.stringify(window.ARCHIVE_DATA, null, 2);
+        const blob = new Blob([data], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Backup_Archivio_' + new Date().toISOString().slice(0,10) + '.json';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        showToast('Backup esportato ✓');
+    } catch(e) {
+        alert('Errore durante l\'esportazione: ' + e.message);
+    }
+}
+
+// ── Importa Backup ──
+function importBackup(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!data || typeof data !== 'object' || !Array.isArray(data.folders)) {
+                alert('File non valido: non è un backup dell\'Archivio Digitale.');
+                return;
+            }
+            if (!confirm('Importando questo backup, il contenuto attuale verrà sostituito. Continuare?')) return;
+            window.ARCHIVE_DATA = data;
+            renderFolders();
+            renderFreeFiles();
+            renderFreeArticles();
+            showToast('Backup importato ✓');
+        } catch(err) {
+            alert('Errore durante l\'importazione: ' + err.message);
+        } finally {
+            event.target.value = '';
+        }
+    };
+    reader.readAsText(file);
+}
+
+window.onload = inizializzaApp;
+        
+    </script>
+</body>
+</html>
