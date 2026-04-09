@@ -2583,7 +2583,7 @@ let dataInChiaro = pwdScelta ? 'null' : dataString;
 '<div id="free-articles-view"><' + '/div>',
 document.getElementById('multi-action-bar').outerHTML,
                     document.getElementById('fab-main').outerHTML,
-                    document.getElementById('header-menu').outerHTML,
+                    (function(){ const m = document.getElementById('header-menu').cloneNode(true); m.classList.remove('open'); const b = m.querySelector('#btn-save'); if(b){b.removeAttribute('disabled');b.textContent='💾 \u00a0Salva';} return m.outerHTML; })(),
                     document.getElementById('menu-overlay').outerHTML,
                     (function(){ const fv = document.getElementById('folder-view').cloneNode(true); fv.style.display='none'; return fv.outerHTML; })(),
                     document.getElementById('preview-modal').outerHTML,
