@@ -755,7 +755,8 @@ margin: 0;
         <input type="file" id="backup-input" accept=".json" onchange="importBackup(event)" style="display:none;">
         <div class="menu-separator"></div>
         <button class="menu-item danger" onclick="emptyArchive(); closeMenu()">🗑️ &nbsp;Svuota Archivio</button>
-    
+    <div class="menu-separator"></div>
+<button class="menu-item" id="btnTema" onclick="cambiaTema(); closeMenu()">🔴 &nbsp;Tema bordeaux</button>
     </div>
     <div class="menu-overlay" id="menu-overlay" onclick="closeMenu()"></div>
         <div class="search-container" onclick="event.stopPropagation()" style="position:relative; top:auto; left:auto; right:auto; background:transparent; backdrop-filter:none; border-bottom:none; padding: 8px 0;">
@@ -2784,6 +2785,84 @@ function importBackup(event) {
 }
 
 window.onload = inizializzaApp;
+     // ── SISTEMA TEMA ──
+const CSS_ORIGINALE = [];
+document.querySelectorAll('style').forEach((tag, i) => { CSS_ORIGINALE[i] = tag.innerHTML; });
+const INLINE_ORIGINALE = new Map();
+document.querySelectorAll('[style]').forEach(el => { INLINE_ORIGINALE.set(el, el.getAttribute('style')); });
+
+const TEMI = {
+  bordeaux: {
+    '#007aff':              '#800020',
+    '#1565C0':              '#800020',
+    '#1565c0':              '#800020',
+    '#f0f7ff':              '#fdf0f3',   // sfondo selezione
+    '#e8f0fe':              '#fdf0f3',   // sfondo breadcrumb
+    '#c5d8fd':              '#e8a0b0',   // bordo breadcrumb
+    'rgba(0,122,255,0.08)': 'rgba(128,0,32,0.08)',  // hover menu
+    '#f5f5f7':                  '#fdf0f3',
+    'rgba(245,245,247,0.92)':   'rgba(253,240,243,0.92)',
+  },
+  verde: {
+    '#007aff':              '#1b5e20',
+    '#1565C0':              '#1b5e20',
+    '#1565c0':              '#1b5e20',
+    '#f0f7ff':              '#e8f5e9',
+    '#e8f0fe':              '#e8f5e9',
+    '#c5d8fd':              '#a5d6a7',
+    'rgba(0,122,255,0.08)': 'rgba(27,94,32,0.08)',
+    '#f5f5f7':                  '#f1f8f1',
+    'rgba(245,245,247,0.92)':   'rgba(241,248,241,0.92)',
+  },
+  arancione: {
+  '#007aff':              '#b34700',
+  '#1565C0':              '#b34700',
+  '#1565c0':              '#b34700',
+  '#f0f7ff':              '#fff3e0',
+  '#e8f0fe':              '#fff3e0',
+  '#c5d8fd':              '#ffcc80',
+  'rgba(0,122,255,0.08)': 'rgba(179,71,0,0.08)',
+    '#f5f5f7':                  '#fff8f0',
+    'rgba(245,245,247,0.92)':   'rgba(255,248,240,0.92)',
+}
+  
+};
+
+const ORDINE_TEMI = ['blu', 'bordeaux', 'verde', 'arancione'];
+const EMOJI_TEMI  = { blu: '🔵', bordeaux: '🔴', verde: '🟢', arancione: '🟠' };
+let temaCorrente = localStorage.getItem('tema-archivio') || 'blu';
+
+function applicaTema(nomeTema) {
+  document.querySelectorAll('style').forEach((tag, i) => { tag.innerHTML = CSS_ORIGINALE[i]; });
+  INLINE_ORIGINALE.forEach((s, el) => { el.setAttribute('style', s); });
+
+  const mappa = TEMI[nomeTema];
+  if (mappa) {
+    document.querySelectorAll('style').forEach(tag => {
+      let css = tag.innerHTML;
+      for (const [da, a] of Object.entries(mappa)) css = css.replaceAll(da, a);
+      tag.innerHTML = css;
+    });
+    document.querySelectorAll('[style]').forEach(el => {
+      let s = el.getAttribute('style');
+      for (const [da, a] of Object.entries(mappa)) s = s.replaceAll(da, a);
+      el.setAttribute('style', s);
+    });
+  }
+
+  temaCorrente = nomeTema;
+  localStorage.setItem('tema-archivio', nomeTema);
+  const prossimo = ORDINE_TEMI[(ORDINE_TEMI.indexOf(nomeTema) + 1) % ORDINE_TEMI.length];
+  const btn = document.getElementById('btnTema');
+  if (btn) btn.innerHTML = `${EMOJI_TEMI[prossimo]} &nbsp;Tema ${prossimo}`;
+}
+
+function cambiaTema() {
+  const prossimo = ORDINE_TEMI[(ORDINE_TEMI.indexOf(temaCorrente) + 1) % ORDINE_TEMI.length];
+  applicaTema(prossimo);
+}
+
+applicaTema(temaCorrente);
         
     </script>
 </body>
