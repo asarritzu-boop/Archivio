@@ -2830,6 +2830,12 @@ const TEMI = {
 
 const ORDINE_TEMI = ['blu', 'bordeaux', 'verde', 'arancione'];
 const EMOJI_TEMI  = { blu: '🔵', bordeaux: '🔴', verde: '🟢', arancione: '🟠' };
+        const THEME_COLOR_META = {
+  blu:       '#007aff',
+  bordeaux:  '#800020',
+  verde:     '#1b5e20',
+  arancione: '#b34700',
+};
 let temaCorrente = localStorage.getItem('tema-archivio') || 'blu';
 
 function applicaTema(nomeTema) {
@@ -2855,6 +2861,8 @@ function applicaTema(nomeTema) {
   const prossimo = ORDINE_TEMI[(ORDINE_TEMI.indexOf(nomeTema) + 1) % ORDINE_TEMI.length];
   const btn = document.getElementById('btnTema');
   if (btn) btn.innerHTML = `${EMOJI_TEMI[prossimo]} &nbsp;Tema ${prossimo}`;
+    document.querySelector('meta[name="theme-color"]')
+  .setAttribute('content', THEME_COLOR_META[nomeTema]);
 }
 
 function cambiaTema() {
