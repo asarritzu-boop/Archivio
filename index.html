@@ -960,7 +960,7 @@ function scheduleAutosave() {
 window.addEventListener('beforeunload', function(e) {
     if (modificheNonSalvate) { e.preventDefault(); e.returnValue = ''; }
 });
-
+document.addEventListener('input', () => { modificheNonSalvate = true; });
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
         clearTimeout(autosaveTimer);
