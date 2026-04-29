@@ -967,7 +967,7 @@ window.addEventListener('beforeunload', function(e) {
 });
 document.addEventListener('input', () => { modificheNonSalvate = true; });
 document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
+    if (document.visibilityState === 'hidden' && modificheNonSalvate) {
         clearTimeout(autosaveTimer);
         eseguiAutosave();
     }
