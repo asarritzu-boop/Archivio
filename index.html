@@ -953,9 +953,14 @@ async function eseguiAutosave() {
 }
 
 function scheduleAutosave() {
+    // 1. Dichiara subito che ci sono modifiche (avviso istantaneo su tutto l'archivio)
+    modificheNonSalvate = true; 
+    
+    // 2. Riavvia il timer di salvataggio
     clearTimeout(autosaveTimer);
     autosaveTimer = setTimeout(eseguiAutosave, 1500);
 }
+
 
 window.addEventListener('beforeunload', function(e) {
     if (modificheNonSalvate) { e.preventDefault(); e.returnValue = ''; }
@@ -1025,6 +1030,7 @@ setTimeout(async () => {
             const parent = getFolderById(currentFolderId);
             if (!parent.subfolders) parent.subfolders = [];
             parent.subfolders.push({ id: 'f_' + Date.now(), name: name.trim(), files: [], subfolders: [] });
+           modificheNonSalvate = true; 1
             renderFiles();
         }
 
@@ -1773,6 +1779,7 @@ function deleteArticle(event, id, folderId) {
             const name = prompt("Nome cartella:");
             if (name) {
                 window.ARCHIVE_DATA.folders.push({ id: 'f_' + Date.now(), name: name.trim(), files: [], subfolders: [] });
+                modificheNonSalvate = true; 
                 renderFolders();
             }
         }
